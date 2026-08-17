@@ -177,7 +177,7 @@ try {
 
 // Runtime message listener
 try {
-  chrome.runtime.onMessage.addListener((message: { type?: string; showOverlay?: boolean }, _sender, sendResponse) => {
+  chrome.runtime.onMessage.addListener((message: { type?: string; showOverlay?: boolean; entries?: any[] }, _sender, sendResponse) => {
     try {
       const currentDetection = detectWorkday(location, document);
 
@@ -205,6 +205,18 @@ try {
               learnedCount: res.learnedCount,
               profileFieldsUpdated: res.profileFieldsUpdated,
               mappingsCreated: res.mappingsCreated
+            });
+          } catch {}
+        });
+        return true;
+      }
+
+      if (message.type === "SAVE_PAGE_VALUES") {
+        void savePageFieldValues(message.entries || [], document, profileStore, mappingStore).then((count) => {
+          try {
+            sendResponse({
+              success: true,
+              count
             });
           } catch {}
         });

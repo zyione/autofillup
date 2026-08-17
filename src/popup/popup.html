@@ -19,27 +19,65 @@
         <div id="site-badge" class="site-badge inactive">Checking...</div>
       </header>
 
-      <main class="popup-body">
-        <div id="page-info" class="page-info" style="display: none;">
-          <span class="tenant-label" id="tenant-name">Tenant: —</span>
-          <h3 class="page-heading" id="page-name">Application Page</h3>
-        </div>
+      <!-- Navigation Tabs inside Popup -->
+      <nav class="popup-nav">
+        <button class="nav-tab active" id="tab-btn-autofill" data-tab="autofill">⚡ Autofill</button>
+        <button class="nav-tab" id="tab-btn-inspector" data-tab="inspector">🔍 Page Inspector</button>
+      </nav>
 
-        <div id="status-card" class="status-card">
-          <p id="status-msg">Open a Workday job application to begin.</p>
-          <div id="metrics-grid" class="metrics-grid" style="display: none;">
-            <div class="metric metric-filled"><strong id="cnt-filled">0</strong><span>Filled</span></div>
-            <div class="metric metric-review"><strong id="cnt-review">0</strong><span>Review</span></div>
-            <div class="metric metric-unknown"><strong id="cnt-unknown">0</strong><span>Unknown</span></div>
-            <div class="metric metric-skipped"><strong id="cnt-skipped">0</strong><span>Skipped</span></div>
+      <main class="popup-body">
+        <!-- 1. Autofill Tab View -->
+        <div id="view-autofill" class="view-pane active">
+          <div id="page-info" class="page-info" style="display: none;">
+            <span class="tenant-label" id="tenant-name">Tenant: —</span>
+            <h3 class="page-heading" id="page-name">Application Page</h3>
+          </div>
+
+          <div id="status-card" class="status-card">
+            <p id="status-msg">Open a Workday job application to begin.</p>
+            <div id="metrics-grid" class="metrics-grid" style="display: none;">
+              <div class="metric metric-filled"><strong id="cnt-filled">0</strong><span>Filled</span></div>
+              <div class="metric metric-review"><strong id="cnt-review">0</strong><span>Review</span></div>
+              <div class="metric metric-unknown"><strong id="cnt-unknown">0</strong><span>Unknown</span></div>
+              <div class="metric metric-skipped"><strong id="cnt-skipped">0</strong><span>Skipped</span></div>
+            </div>
+          </div>
+
+          <div class="actions">
+            <button id="autofill-btn" class="btn btn-primary" disabled>Autofill Page</button>
+            <button id="learn-page-btn" class="btn btn-learn" style="display: none;">💾 Learn & Save Page to Profile</button>
+            <button id="review-btn" class="btn btn-secondary" style="display: none;">Review & Teach Unknown</button>
+            <button id="forget-page-btn" class="btn btn-danger-outline" style="display: none;">🔄 Reset & Forget Page Mappings</button>
           </div>
         </div>
 
-        <div class="actions">
-          <button id="autofill-btn" class="btn btn-primary" disabled>Autofill Page</button>
-          <button id="learn-page-btn" class="btn btn-learn" style="display: none;">💾 Learn & Save Page to Profile</button>
-          <button id="review-btn" class="btn btn-secondary" style="display: none;">Review & Teach Unknown</button>
-          <button id="forget-page-btn" class="btn btn-danger-outline" style="display: none;">🔄 Reset & Forget Page Mappings</button>
+        <!-- 2. Page Inspector Tab View -->
+        <div id="view-inspector" class="view-pane">
+          <div class="inspector-banner">
+            <div id="inspector-toast" class="toast" style="display: none;"></div>
+            <div class="action-banner">
+              <button id="ins-learn-btn" class="btn-quick-learn" title="Pull values currently typed into the Workday form into this editor">
+                📥 Extract from Form
+              </button>
+              <button id="ins-save-profile-btn" class="btn-save-profile" title="Save all values to your profile & mappings without modifying the page">
+                💾 Save to Profile
+              </button>
+            </div>
+          </div>
+
+          <div class="fields-table-container">
+            <div class="fields-table-header">
+              <span id="fields-count-title">Detected Fields (0)</span>
+              <span style="font-size:10px;color:#38bdf8;">Edit & Save Values</span>
+            </div>
+            <div class="fields-list" id="popup-fields-list">
+              <p style="padding:16px;font-size:12px;color:#94a3b8;text-align:center;">No fields detected. Open a Workday job application tab first.</p>
+            </div>
+          </div>
+
+          <div style="margin-top: 10px;">
+            <button id="ins-autofill-btn" class="btn btn-primary">⚡ Autofill Page Now</button>
+          </div>
         </div>
       </main>
 
