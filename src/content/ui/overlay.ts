@@ -8,7 +8,7 @@ export interface OverlayOptions {
   profile: UserProfile;
   onTeach: (fieldId: string, source: any, valueOrPath: string, fixedValue?: string, enteredValue?: string) => Promise<void>;
   onLearnPage: () => Promise<LearnResult>;
-  onSavePageValues: (entries: FieldSaveEntry[]) => Promise<number>;
+  onSavePageValues: (entries: FieldSaveEntry[], autofillAfterSave?: boolean) => Promise<number>;
   onForgetPage: () => Promise<{ removedCount: number }>;
   onClose: () => void;
   onRefill: () => void;
@@ -17,6 +17,7 @@ export interface OverlayOptions {
 export class AssistantOverlay {
   private host: HTMLElement | null = null;
   private shadow: ShadowRoot | null = null;
+  private activeTab: "inspector" | "autofill" = "inspector";
 
   show(options: OverlayOptions): void {
     this.remove();
@@ -39,7 +40,7 @@ export class AssistantOverlay {
         border-radius: 14px;
         box-shadow: 0 20px 35px -5px rgba(0, 0, 0, 0.6), 0 10px 15px -6px rgba(0, 0, 0, 0.5);
         border: 1px solid #334155;
-        width: 390px;
+        width: 395px;
         overflow: hidden;
         animation: slideIn 0.22s cubic-bezier(0.16, 1, 0.3, 1);
       }
@@ -48,21 +49,36 @@ export class AssistantOverlay {
         to { opacity: 1; transform: translateY(0) scale(1); }
       }
       .header {
-        padding: 12px 16px;
+        padding: 10px 14px;
         background: #1e293b;
         display: flex;
         align-items: center;
         justify-content: space-between;
         border-bottom: 1px solid #334155;
       }
-      .header-title {
-        margin: 0;
-        font-size: 13px;
-        font-weight: 700;
-        color: #38bdf8;
+      .tab-nav {
         display: flex;
-        align-items: center;
-        gap: 6px;
+        gap: 4px;
+      }
+      .tab-btn {
+        background: transparent;
+        border: none;
+        color: #94a3b8;
+        padding: 6px 10px;
+        font-size: 12px;
+        font-weight: 600;
+        border-radius: 6px;
+        cursor: pointer;
+        transition: all 0.15s ease;
+      }
+      .tab-btn.active {
+        background: #0f172a;
+        color: #38bdf8;
+        border: 1px solid #334155;
+      }
+      .tab-btn:hover:not(.active) {
+        color: #f1f5f9;
+        background: rgba(255, 255, 255, 0.05);
       }
       .close-btn {
         background: transparent;
@@ -80,26 +96,18 @@ export class AssistantOverlay {
       }
       .body {
         padding: 12px 14px;
-        max-height: 480px;
+        max-height: 470px;
         overflow-y: auto;
       }
-      .stats {
-        display: flex;
-        gap: 6px;
-        flex-wrap: wrap;
-        margin-bottom: 10px;
-      }
-      .badge {
-        font-size: 11px;
-        font-weight: 600;
-        padding: 3px 8px;
-        border-radius: 9999px;
-      }
-      .badge-filled { background: #064e3b; color: #34d399; }
-      .badge-review { background: #78350f; color: #fbbf24; }
-      .badge-unknown { background: #4c1d95; color: #c084fc; }
-      .badge-skipped { background: #334155; color: #94a3b8; }
       
+      .tab-pane {
+        display: none;
+      }
+      .tab-pane.active {
+        display: block;
+      }
+
+      /* Inspector Tab Styles */
       .action-banner {
         display: flex;
         gap: 6px;
@@ -124,7 +132,7 @@ export class AssistantOverlay {
         background: #047857;
         color: #fff;
       }
-      .btn-save-all {
+      .btn-save-profile {
         flex: 1;
         background: #0284c7;
         color: #fff;
@@ -139,7 +147,7 @@ export class AssistantOverlay {
         justify-content: center;
         gap: 4px;
       }
-      .btn-save-all:hover {
+      .btn-save-profile:hover {
         background: #0369a1;
       }
 
@@ -253,6 +261,48 @@ export class AssistantOverlay {
         color: #fff;
       }
 
+      /* Autofill Tab Styles */
+      .stats {
+        display: flex;
+        gap: 6px;
+        flex-wrap: wrap;
+        margin-bottom: 12px;
+      }
+      .badge {
+        font-size: 11px;
+        font-weight: 600;
+        padding: 3px 8px;
+        border-radius: 9999px;
+      }
+      .badge-filled { background: #064e3b; color: #34d399; }
+      .badge-review { background: #78350f; color: #fbbf24; }
+      .badge-unknown { background: #4c1d95; color: #c084fc; }
+      .badge-skipped { background: #334155; color: #94a3b8; }
+
+      .autofill-action-card {
+        background: #1e293b;
+        border: 1px solid #334155;
+        border-radius: 8px;
+        padding: 14px;
+        text-align: center;
+        margin-bottom: 12px;
+      }
+      .btn-autofill-main {
+        width: 100%;
+        background: #0284c7;
+        color: #fff;
+        border: none;
+        border-radius: 8px;
+        padding: 10px;
+        font-size: 13px;
+        font-weight: 700;
+        cursor: pointer;
+        transition: background 0.15s ease;
+      }
+      .btn-autofill-main:hover {
+        background: #0369a1;
+      }
+
       .toast {
         background: #065f46;
         color: #34d399;
@@ -274,16 +324,6 @@ export class AssistantOverlay {
         border-top: 1px solid #334155;
         font-size: 11px;
       }
-      .refill-btn {
-        background: #334155;
-        color: #f8fafc;
-        border: none;
-        border-radius: 4px;
-        padding: 4px 8px;
-        cursor: pointer;
-      }
-      .refill-btn:hover { background: #475569; }
-
       .forget-btn {
         background: transparent;
         color: #f87171;
@@ -350,80 +390,99 @@ export class AssistantOverlay {
     card.className = "card";
     card.innerHTML = `
       <div class="header">
-        <h3 class="header-title">⚡ AutoFillUp Page Inspector</h3>
+        <div class="tab-nav">
+          <button class="tab-btn ${this.activeTab === "inspector" ? "active" : ""}" data-tab="inspector">
+            🔍 Page Inspector
+          </button>
+          <button class="tab-btn ${this.activeTab === "autofill" ? "active" : ""}" data-tab="autofill">
+            ⚡ Autofill
+          </button>
+        </div>
         <button class="close-btn" title="Close status">×</button>
       </div>
+
       <div class="body">
         <div id="toast-msg" class="toast"></div>
 
-        <div class="stats">
-          ${counts.filled ? `<span class="badge badge-filled">✓ ${counts.filled} Filled</span>` : ""}
-          ${counts.review ? `<span class="badge badge-review">⚠ ${counts.review} Review</span>` : ""}
-          ${counts.unknown ? `<span class="badge badge-unknown">? ${counts.unknown} Unknown</span>` : ""}
-          ${counts.skipped ? `<span class="badge badge-skipped">${counts.skipped} Skipped</span>` : ""}
-          ${!options.outcomes.length ? `<span class="badge badge-skipped">No inputs found</span>` : ""}
-        </div>
-
-        <div class="action-banner">
-          <button id="learn-page-btn" class="btn-quick-learn" title="Extract filled inputs from page into editor & profile">
-            📥 Learn from Form
-          </button>
-          <button id="save-all-btn" class="btn-save-all" title="Save all edited field values and fill page">
-            💾 Save All & Fill Page
-          </button>
-        </div>
-
-        <div class="fields-table-container">
-          <div class="fields-table-header">
-            <span>Detected Page Fields (${options.outcomes.length})</span>
-            <span style="font-size:10px;color:#38bdf8;">Edit & Save Values</span>
+        <!-- 1. Inspector Tab (Edit & Save to Profile first without autofilling) -->
+        <div id="tab-inspector" class="tab-pane ${this.activeTab === "inspector" ? "active" : ""}">
+          <div class="action-banner">
+            <button id="learn-page-btn" class="btn-quick-learn" title="Pull values currently typed into the Workday form into this editor">
+              📥 Extract from Form
+            </button>
+            <button id="save-profile-btn" class="btn-save-profile" title="Save all values to your profile & mappings without modifying the page">
+              💾 Save to Profile
+            </button>
           </div>
-          <div class="fields-list" id="fields-list">
-            ${options.outcomes
-              .map((item) => {
-                let domVal = "";
-                try {
-                  const el = document.getElementById(item.fieldId) || document.querySelector(`[name="${CSS.escape(item.fieldId)}"]`);
-                  if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) {
-                    domVal = el.value.trim();
-                  } else if (el?.textContent) {
-                    const txt = el.textContent.trim();
-                    if (!txt.startsWith("Select") && txt !== "Choose...") domVal = txt;
-                  }
-                } catch {}
 
-                const initialVal = item.valueAttempted || domVal || "";
-                const isUnknown = item.outcome === "unknown" || item.outcome === "review" || !initialVal;
+          <div class="fields-table-container">
+            <div class="fields-table-header">
+              <span>Detected Page Fields (${options.outcomes.length})</span>
+              <span style="font-size:10px;color:#38bdf8;">Edit & Save Values</span>
+            </div>
+            <div class="fields-list" id="fields-list">
+              ${options.outcomes
+                .map((item) => {
+                  let domVal = "";
+                  try {
+                    const el = document.getElementById(item.fieldId) || document.querySelector(`[name="${CSS.escape(item.fieldId)}"]`);
+                    if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) {
+                      domVal = el.value.trim();
+                    } else if (el?.textContent) {
+                      const txt = el.textContent.trim();
+                      if (!txt.startsWith("Select") && txt !== "Choose...") domVal = txt;
+                    }
+                  } catch {}
 
-                return `
-                  <div class="field-item" data-id="${item.fieldId}">
-                    <div class="field-top-row">
-                      <span class="field-label" title="${item.label}">${item.label}</span>
-                      <span class="field-kind-badge">${item.kind}</span>
+                  const initialVal = item.valueAttempted || domVal || "";
+                  const isUnknown = item.outcome === "unknown" || item.outcome === "review" || !initialVal;
+
+                  return `
+                    <div class="field-item" data-id="${item.fieldId}">
+                      <div class="field-top-row">
+                        <span class="field-label" title="${item.label}">${item.label}</span>
+                        <span class="field-kind-badge">${item.kind}</span>
+                      </div>
+                      <div class="field-input-row">
+                        <input 
+                          type="text" 
+                          class="field-input" 
+                          data-field-id="${item.fieldId}" 
+                          data-label="${item.label}" 
+                          placeholder="${isUnknown ? 'Type answer to save...' : 'Value to fill'}" 
+                          value="${initialVal.replace(/"/g, "&quot;")}"
+                        />
+                        <button class="btn-row-save" data-field-id="${item.fieldId}" data-label="${item.label}" title="Save this value to Profile">💾</button>
+                        <button class="btn-row-teach" data-field-id="${item.fieldId}" title="Advanced teach / map options">⚙</button>
+                      </div>
                     </div>
-                    <div class="field-input-row">
-                      <input 
-                        type="text" 
-                        class="field-input" 
-                        data-field-id="${item.fieldId}" 
-                        data-label="${item.label}" 
-                        placeholder="${isUnknown ? 'Type answer to save...' : 'Value to fill'}" 
-                        value="${initialVal.replace(/"/g, "&quot;")}"
-                      />
-                      <button class="btn-row-save" data-field-id="${item.fieldId}" data-label="${item.label}" title="Save this field value">💾</button>
-                      <button class="btn-row-teach" data-field-id="${item.fieldId}" title="Advanced teach / map options">⚙</button>
-                    </div>
-                  </div>
-                `;
-              })
-              .join("")}
+                  `;
+                })
+                .join("")}
+            </div>
+          </div>
+        </div>
+
+        <!-- 2. Autofill Tab (Status overview & execute autofill) -->
+        <div id="tab-autofill" class="tab-pane ${this.activeTab === "autofill" ? "active" : ""}">
+          <div class="stats">
+            ${counts.filled ? `<span class="badge badge-filled">✓ ${counts.filled} Filled</span>` : ""}
+            ${counts.review ? `<span class="badge badge-review">⚠ ${counts.review} Review</span>` : ""}
+            ${counts.unknown ? `<span class="badge badge-unknown">? ${counts.unknown} Unknown</span>` : ""}
+            ${counts.skipped ? `<span class="badge badge-skipped">${counts.skipped} Skipped</span>` : ""}
+            ${!options.outcomes.length ? `<span class="badge badge-skipped">No inputs found</span>` : ""}
+          </div>
+
+          <div class="autofill-action-card">
+            <p style="font-size:12px;color:#94a3b8;margin-bottom:12px;">Ready to populate all matching fields into the current application form.</p>
+            <button id="autofill-main-btn" class="btn-autofill-main">⚡ Autofill Page Now</button>
           </div>
         </div>
       </div>
 
       <div class="footer">
         <button class="forget-btn" id="forget-btn" title="Clear form inputs and forget custom mappings for this page">🔄 Forget Page</button>
-        <button class="refill-btn" id="refill-btn">Rescan & Refill</button>
+        <span style="color:#64748b;">Local & Privacy-Safe</span>
       </div>
     `;
 
@@ -432,14 +491,29 @@ export class AssistantOverlay {
 
     const toast = card.querySelector<HTMLDivElement>("#toast-msg")!;
     const learnBtn = card.querySelector<HTMLButtonElement>("#learn-page-btn");
-    const saveAllBtn = card.querySelector<HTMLButtonElement>("#save-all-btn");
+    const saveProfileBtn = card.querySelector<HTMLButtonElement>("#save-profile-btn");
+    const autofillMainBtn = card.querySelector<HTMLButtonElement>("#autofill-main-btn");
     const forgetBtn = card.querySelector<HTMLButtonElement>("#forget-btn");
 
-    // Handle "Save All & Fill Page"
-    if (saveAllBtn) {
-      saveAllBtn.addEventListener("click", async () => {
-        saveAllBtn.disabled = true;
-        saveAllBtn.textContent = "Saving & Filling...";
+    // Tab switching handlers
+    card.querySelectorAll<HTMLButtonElement>(".tab-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const tab = btn.getAttribute("data-tab") as "inspector" | "autofill";
+        this.activeTab = tab;
+        card.querySelectorAll(".tab-btn").forEach((b) => b.classList.remove("active"));
+        card.querySelectorAll(".tab-pane").forEach((p) => p.classList.remove("active"));
+
+        btn.classList.add("active");
+        const targetPane = card.querySelector(`#tab-${tab}`);
+        if (targetPane) targetPane.classList.add("active");
+      });
+    });
+
+    // Handle "Save to Profile" (Saves to storage WITHOUT modifying the webpage)
+    if (saveProfileBtn) {
+      saveProfileBtn.addEventListener("click", async () => {
+        saveProfileBtn.disabled = true;
+        saveProfileBtn.textContent = "Saving to Profile...";
 
         const inputs = card.querySelectorAll<HTMLInputElement>(".field-input");
         const entries: FieldSaveEntry[] = [];
@@ -453,18 +527,24 @@ export class AssistantOverlay {
         });
 
         try {
-          const count = await options.onSavePageValues(entries);
-          toast.textContent = `✓ Saved ${count} field values & updated page!`;
+          const count = await options.onSavePageValues(entries, false);
+          toast.textContent = `✓ Saved ${count} values to Profile & Mappings! (Page not modified)`;
           toast.style.display = "block";
-          setTimeout(() => {
-            options.onRefill();
-          }, 800);
+          saveProfileBtn.disabled = false;
+          saveProfileBtn.textContent = "💾 Save to Profile";
         } catch {
           toast.textContent = "Error saving values.";
           toast.style.display = "block";
-          saveAllBtn.disabled = false;
-          saveAllBtn.textContent = "💾 Save All & Fill Page";
+          saveProfileBtn.disabled = false;
+          saveProfileBtn.textContent = "💾 Save to Profile";
         }
+      });
+    }
+
+    // Handle "Autofill Page Now"
+    if (autofillMainBtn) {
+      autofillMainBtn.addEventListener("click", () => {
+        options.onRefill();
       });
     }
 
@@ -484,12 +564,10 @@ export class AssistantOverlay {
 
         btn.disabled = true;
         try {
-          await options.onSavePageValues([{ fieldId: fieldId || "", label, value: val }]);
-          toast.textContent = `✓ Saved "${label}" = "${val}"`;
+          await options.onSavePageValues([{ fieldId: fieldId || "", label, value: val }], false);
+          toast.textContent = `✓ Saved "${label}" = "${val}" to profile`;
           toast.style.display = "block";
-          setTimeout(() => {
-            options.onRefill();
-          }, 600);
+          btn.disabled = false;
         } catch {
           toast.textContent = `Error saving ${label}`;
           toast.style.display = "block";
@@ -498,7 +576,7 @@ export class AssistantOverlay {
       });
     });
 
-    // Handle "Learn from Form"
+    // Handle "Extract from Form"
     if (learnBtn) {
       learnBtn.addEventListener("click", async () => {
         learnBtn.disabled = true;
@@ -510,19 +588,18 @@ export class AssistantOverlay {
             const breakdown = allItems.slice(0, 5).map((item) => `• ${item}`).join("<br/>");
             const extra = allItems.length > 5 ? `<br/>...and ${allItems.length - 5} more` : "";
 
-            toast.innerHTML = `<strong>✓ Learned ${res.learnedCount} Field(s):</strong><br/>${breakdown}${extra}`;
+            toast.innerHTML = `<strong>✓ Extracted & Saved ${res.learnedCount} Field(s):</strong><br/>${breakdown}${extra}`;
             toast.style.display = "block";
-            setTimeout(() => {
-              options.onRefill();
-            }, 1000);
+            learnBtn.disabled = false;
+            learnBtn.textContent = "📥 Extract from Form";
           } else {
-            toast.textContent = "No filled values detected on page yet. Type values into the form or editor first!";
+            toast.textContent = "No filled values detected on form yet. Type values on the form first!";
             toast.style.display = "block";
-            learnBtn.textContent = "📥 Learn from Form";
+            learnBtn.textContent = "📥 Extract from Form";
             learnBtn.disabled = false;
           }
         } catch {
-          toast.textContent = "Error learning from page.";
+          toast.textContent = "Error extracting from form.";
           toast.style.display = "block";
           learnBtn.disabled = false;
         }
@@ -550,7 +627,6 @@ export class AssistantOverlay {
     }
 
     card.querySelector(".close-btn")?.addEventListener("click", () => this.remove());
-    card.querySelector("#refill-btn")?.addEventListener("click", () => options.onRefill());
 
     // Handle advanced teach button (⚙)
     card.querySelectorAll<HTMLButtonElement>(".btn-row-teach").forEach((btn) => {
@@ -647,7 +723,7 @@ export class AssistantOverlay {
 
         <div class="modal-actions">
           <button class="modal-btn modal-btn-cancel" id="modal-cancel">Cancel</button>
-          <button class="modal-btn modal-btn-save" id="modal-save">Save & Fill</button>
+          <button class="modal-btn modal-btn-save" id="modal-save">Save & Map</button>
         </div>
       </div>
     `;

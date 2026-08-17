@@ -96,9 +96,13 @@ async function runAutofill(showOverlayUI = true, isManual = false): Promise<{ ou
         onLearnPage: async () => {
           return await learnCurrentPageValues(document, profileStore, mappingStore);
         },
-        onSavePageValues: async (entries) => {
+        onSavePageValues: async (entries, autofillAfterSave = false) => {
           const count = await savePageFieldValues(entries, document, profileStore, mappingStore);
-          void runAutofill(true, true);
+          if (autofillAfterSave) {
+            void runAutofill(true, true);
+          } else {
+            void runAutofill(true, false);
+          }
           return count;
         },
         onForgetPage: async () => {
