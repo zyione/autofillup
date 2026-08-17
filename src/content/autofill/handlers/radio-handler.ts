@@ -76,6 +76,12 @@ export async function fillRadioGroup(
     dispatchEventSequence(matchedRadio);
     matchedRadio.click();
 
+    // Trigger click on parent label / container to ensure Workday React listeners update
+    const parentLabel = matchedRadio.closest("label, [data-automation-id*='radio'], [data-automation-id*='choice']");
+    if (parentLabel && parentLabel !== matchedRadio) {
+      (parentLabel as HTMLElement).click();
+    }
+
     return {
       fieldId: field.id,
       label: field.fingerprint.label,

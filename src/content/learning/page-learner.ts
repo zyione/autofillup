@@ -51,8 +51,10 @@ export function extractCurrentFieldValue(field: FieldDescriptor): string | undef
   }
 
   // Workday custom dropdown or combobox
-  const text = el.textContent?.replace(/\s+/g, " ").trim();
+  let text = el.textContent?.replace(/\s+/g, " ").trim();
   if (text && text !== "Select..." && text !== "Choose..." && !text.startsWith("Select ") && text.length > 0) {
+    // Strip trailing clear icons like 'x' or '✕'
+    text = text.replace(/[\u00D7\u2715xX]\s*$/, "").trim();
     return text;
   }
 
@@ -60,9 +62,10 @@ export function extractCurrentFieldValue(field: FieldDescriptor): string | undef
 }
 
 const standardProfileMatchRules: Array<{ pattern: RegExp; section: keyof UserProfile; field: string; label: string }> = [
-  { pattern: /\b(legal\s+)?(first|given)\s+name\b/i, section: "personal", field: "firstName", label: "First Name" },
-  { pattern: /\bmiddle\s+name\b/i, section: "personal", field: "middleName", label: "Middle Name" },
-  { pattern: /\b(legal\s+)?(last|family|surname)\s+name\b/i, section: "personal", field: "lastName", label: "Last Name" },
+  { pattern: /\b(legal\s+)?(first|given)\s*name\b/i, section: "personal", field: "firstName", label: "First Name" },
+  { pattern: /\bgiven\s*name\b/i, section: "personal", field: "firstName", label: "First Name" },
+  { pattern: /\bmiddle\s*name\b/i, section: "personal", field: "middleName", label: "Middle Name" },
+  { pattern: /\b(legal\s+)?(last|family|surname)\s*name\b/i, section: "personal", field: "lastName", label: "Last Name" },
   { pattern: /\b(last|family|surname)\b/i, section: "personal", field: "lastName", label: "Last Name" },
   { pattern: /\bpreferred\s+(name|first\s+name)\b/i, section: "personal", field: "preferredName", label: "Preferred Name" },
   { pattern: /\be[- ]?mail(\s+address)?\b/i, section: "contact", field: "email", label: "Email Address" },
@@ -74,6 +77,7 @@ const standardProfileMatchRules: Array<{ pattern: RegExp; section: keyof UserPro
   { pattern: /\b(zip|postal)(\s+code)?\b/i, section: "contact", field: "postalCode", label: "Postal Code" },
   { pattern: /\bcountry(\s*\/\s*territory)?\b/i, section: "contact", field: "country", label: "Country" },
   { pattern: /\blinkedin\b/i, section: "professional", field: "linkedin", label: "LinkedIn" },
+  { pattern: /\bsocial\s+network\s+url(s)?\b/i, section: "professional", field: "linkedin", label: "LinkedIn" },
   { pattern: /\bgithub\b/i, section: "professional", field: "github", label: "GitHub" },
   { pattern: /\bportfolio\b/i, section: "professional", field: "portfolio", label: "Portfolio" },
   { pattern: /\b(website|personal\s+site)\b/i, section: "professional", field: "website", label: "Website" }
