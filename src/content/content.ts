@@ -102,8 +102,10 @@ async function runAutofill(showOverlayUI = true, isManual = false): Promise<{ ou
         outcomes,
         unknownFields: unknownList,
         profile,
-        onTeach: async (fieldId, source, pathOrVal, fixedVal, enteredVal) => {
-          await teachingController.teachField(fieldId, source, pathOrVal, fixedVal, enteredVal);
+        onTeach: async (fieldId, source, pathOrVal, fixedVal, enteredVal, fallbackLabel) => {
+          await teachingController.teachField(fieldId, source, pathOrVal, fixedVal, enteredVal, {
+            fingerprint: { label: fallbackLabel || "", accessibleName: "", placeholder: "", kind: "text", section: "", tenant: "*" }
+          });
           void runAutofill(true, false);
         },
         onLearnPage: async () => {

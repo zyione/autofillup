@@ -12,20 +12,46 @@ export class MappingStore {
 
   async save(mapping: FieldMapping): Promise<void> {
     const all = await this.list();
-    const index = all.findIndex((item) => item.id === mapping.id);
+    const mappingLabel = mapping.fingerprint.label?.toLowerCase().trim();
     const now = new Date().toISOString();
+
     const prepared: FieldMapping = {
       ...mapping,
       updatedAt: now,
       createdAt: mapping.createdAt || now
     };
 
+    // Match by ID or by exact label to replace previous rule
+    const index = all.findIndex((item) => {
+      if (item.id === mapping.id) return true;
+      if (mappingLabel && item.fingerprint?.label?.toLowerCase().trim() === mappingLabel) {
+        return true;
+      }
+      return false;
+    });
+
     if (index < 0) {
       all.push(prepared);
     } else {
       all[index] = prepared;
     }
+
     await this.storage.set(key, all);
+
+    // Update safety snapshot
+    try {
+      if (typeof chrome !== "undefined" && chrome.storage?.local) {
+        const raw = await chrome.storage.local.get(["profile", "settings"]);
+        await chrome.storage.local.set({
+          autofillup_backup_snapshot: {
+            profile: raw.profile || {},
+            fieldMappings: all,
+            settings: raw.settings || {},
+            savedAt: now
+          }
+        });
+      }
+    } catch {}
   }
 
   async remove(id: string): Promise<void> {

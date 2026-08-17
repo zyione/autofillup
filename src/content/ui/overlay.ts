@@ -6,7 +6,7 @@ export interface OverlayOptions {
   outcomes: FieldFillResult[];
   unknownFields: UnknownFieldInfo[];
   profile: UserProfile;
-  onTeach: (fieldId: string, source: any, valueOrPath: string, fixedValue?: string, enteredValue?: string) => Promise<void>;
+  onTeach: (fieldId: string, source: any, valueOrPath: string, fixedValue?: string, enteredValue?: string, fallbackLabel?: string) => Promise<void>;
   onLearnPage: () => Promise<LearnResult>;
   onSavePageValues: (entries: FieldSaveEntry[], autofillAfterSave?: boolean) => Promise<number>;
   onForgetPage: () => Promise<{ removedCount: number }>;
@@ -853,7 +853,7 @@ export class AssistantOverlay {
       }
 
       modalBackdrop.remove();
-      void options.onTeach(field.fieldId, type, pathOrValue, fixedVal, enteredVal);
+      void options.onTeach(field.fieldId, type, pathOrValue, fixedVal, enteredVal, field.label);
     });
 
     this.shadow.appendChild(modalBackdrop);

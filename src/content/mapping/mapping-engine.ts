@@ -74,17 +74,19 @@ export class MappingEngine {
     const combinedLabel = `${label} ${accessibleName}`.trim();
     const tenant = field.fingerprint.tenant;
 
-    // 1. Check exact user saved mapping (highest priority)
-    const userMapping = this.savedMappings.find((m) => {
+    // 1. Check exact user saved mapping (highest priority, newest rule wins)
+    const matchingUserMappings = this.savedMappings.filter((m) => {
       if (!m.enabled) return false;
       if (m.tenantScope !== "*" && m.tenantScope !== tenant) return false;
-      const mappingLabel = normalizeLabel(m.fingerprint.label);
+      const mappingLabel = normalizeLabel(m.fingerprint?.label);
       return (
         mappingLabel === label ||
         mappingLabel === accessibleName ||
         (rawLabelLower && mappingLabel === rawLabelLower)
       );
     });
+
+    const userMapping = matchingUserMappings.sort((a, b) => (b.updatedAt || "").localeCompare(a.updatedAt || ""))[0];
 
     if (userMapping) {
       if (userMapping.source === "ignore") {

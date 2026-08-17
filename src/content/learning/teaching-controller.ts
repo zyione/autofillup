@@ -45,12 +45,19 @@ export class TeachingController {
     mappingSource: "profile" | "customField" | "applicationAnswer" | "fixedValue" | "ignore",
     valueOrPath: string,
     fixedValue?: string,
-    enteredValue?: string
+    enteredValue?: string,
+    fallbackDescriptor?: Partial<FieldDescriptor>
   ): Promise<FieldMapping | null> {
     const entry = this.unknownQueue.get(fieldId);
-    if (!entry) return null;
+    const fingerprint = entry?.descriptor.fingerprint || {
+      label: fallbackDescriptor?.fingerprint?.label || fallbackDescriptor?.rawLabel || "",
+      accessibleName: fallbackDescriptor?.fingerprint?.accessibleName || "",
+      placeholder: fallbackDescriptor?.fingerprint?.placeholder || "",
+      kind: fallbackDescriptor?.fingerprint?.kind || "text",
+      section: fallbackDescriptor?.fingerprint?.section || "",
+      tenant: "*"
+    };
 
-    const { descriptor } = entry;
     const now = new Date().toISOString();
 
     // 1. If mapping to personal/contact profile and a value was provided, persist to profile
@@ -78,7 +85,7 @@ export class TeachingController {
 
     const newMapping: FieldMapping = {
       id: typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `mapping-${Date.now()}`,
-      fingerprint: descriptor.fingerprint,
+      fingerprint,
       source: mappingSource,
       sourcePath: mappingSource !== "fixedValue" && mappingSource !== "ignore" ? valueOrPath : undefined,
       fixedValue: mappingSource === "fixedValue" ? fixedValue || enteredValue || valueOrPath : undefined,
