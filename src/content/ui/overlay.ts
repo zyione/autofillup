@@ -446,19 +446,8 @@ export class AssistantOverlay {
             <div class="fields-list" id="fields-list">
               ${options.outcomes
                 .map((item) => {
-                  let domVal = "";
-                  try {
-                    const el = document.getElementById(item.fieldId) || document.querySelector(`[name="${CSS.escape(item.fieldId)}"]`);
-                    if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) {
-                      domVal = el.value.trim();
-                    } else if (el?.textContent) {
-                      const txt = el.textContent.trim();
-                      if (!txt.startsWith("Select") && txt !== "Choose...") domVal = txt;
-                    }
-                  } catch {}
-
                   const isIgnored = item.mappingSource === "ignore" || item.outcome === "skipped";
-                  const initialVal = isIgnored ? "" : item.valueAttempted || domVal || "";
+                  const initialVal = isIgnored ? "" : item.valueAttempted || "";
                   const isUnknown = !isIgnored && (item.outcome === "unknown" || item.outcome === "review" || !initialVal);
 
                   return `
@@ -708,7 +697,7 @@ export class AssistantOverlay {
     else if (labelLower.includes("portfolio")) defaultProfilePath = "professional.portfolio";
     else if (labelLower.includes("website")) defaultProfilePath = "professional.website";
 
-    const currentProfileVal = getProfileValueByPath(options.profile, defaultProfilePath) || pageCurrentValue;
+    const currentProfileVal = getProfileValueByPath(options.profile, defaultProfilePath) || "";
 
     const modalBackdrop = document.createElement("div");
     modalBackdrop.className = "modal-backdrop";
