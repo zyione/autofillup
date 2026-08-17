@@ -2,14 +2,14 @@
 
 AutoFillUp – MyWorkday is a privacy-first Chrome extension for assisting with repetitive Workday job-application entry. It is designed to keep the applicant in control: the extension will never submit an application.
 
-> **Current status: Milestone 1 – Chrome Extension Foundation.** This release creates an installable Manifest V3 extension shell. It does **not** yet detect application fields, store an editable profile, or fill forms.
+> **Current status: first usable Workday prototype.** It provides local profile editing and conservative filling of common text/select fields. Always review every answer; Workday’s UI can differ by tenant and application.
 
 ## What is included
 
 - Chrome Extension Manifest V3 configuration.
 - A background service worker with a small typed message contract.
 - A content-script entry point scoped to Apex Group's Workday site.
-- Popup and options-page shells.
+- Popup and options page for local identity/contact/link details and reusable answers.
 - Typed wrappers around `chrome.storage.local` for future local-only profile data.
 - Shared logging, utility, profile, session, and ATS-adapter interfaces.
 - Type checking, one unit test, and a Vite production-build workflow.
@@ -18,10 +18,8 @@ AutoFillUp – MyWorkday is a privacy-first Chrome extension for assisting with 
 
 The following are deliberately outside this foundation milestone:
 
-- Workday/application-page detection.
-- Reading, detecting, or changing form fields.
-- Autofill, page observation, mapping, or unknown-field teaching.
-- Editable profile and reusable-answer screens.
+- Reliable support for every custom Workday component, including complex comboboxes, radio groups, and checkboxes. These are flagged for review rather than guessed.
+- Full unknown-field teaching UI, repeating employment/education entry creation, and mapping-library management.
 - Other ATS integrations.
 - AI-generated content, resume analysis, or job matching.
 - Automatic application submission.
@@ -88,13 +86,15 @@ After it loads, Chrome should display the extension without manifest errors.
 
 ## Manual smoke test
 
-This milestone is intentionally passive. A successful test confirms the extension foundation—not autofill behavior.
+This prototype uses conservative built-in mappings for common identity, contact, and professional-link fields. It does not overwrite an existing value unless you enable that option in settings.
 
-1. Click the pinned extension icon. The popup should say `Foundation ready` with the installed version.
-2. Open the extension’s **Details** page in `chrome://extensions` and select **Extension options**. The page should confirm that local extension storage is ready.
+1. Open the extension’s **Details** page in `chrome://extensions` and select **Extension options**. Add a test first name, last name, email, and phone number, then save.
+2. Visit an Apex Group Workday application page and click the pinned extension icon.
+3. Select **Fill this page** and confirm its summary and the in-page review panel appear.
+4. Verify that only appropriate empty text/select fields were changed, then undo or correct any value before continuing.
 3. Visit `https://theapexgroup.wd3.myworkdayjobs.com/`.
 4. Open the page’s Developer Tools console. A debug message beginning with `[AutoFillUp] Content-script foundation loaded` confirms the scoped content script was loaded.
-5. Confirm that no Workday fields change. This is expected until a later milestone implements detection and autofill.
+5. Confirm that the extension does not press Next, Submit, or accept terms/consents for you.
 
 ### If Chrome reports an error
 
