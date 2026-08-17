@@ -30,6 +30,9 @@ export class AssistantOverlay {
       return acc;
     }, {});
 
+    const filledItems = options.outcomes.filter((o) => o.outcome === "filled" || (o.outcome === "skipped" && o.valueAttempted));
+    const remainingUnknown = options.unknownFields;
+
     const style = document.createElement("style");
     style.textContent = `
       .card {
@@ -38,7 +41,7 @@ export class AssistantOverlay {
         border-radius: 12px;
         box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.5);
         border: 1px solid #334155;
-        width: 340px;
+        width: 360px;
         overflow: hidden;
         animation: slideIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
       }
@@ -79,16 +82,18 @@ export class AssistantOverlay {
       }
       .body {
         padding: 14px 16px;
+        max-height: 480px;
+        overflow-y: auto;
       }
       .stats {
         display: flex;
-        gap: 8px;
+        gap: 6px;
         flex-wrap: wrap;
         margin-bottom: 12px;
       }
       .badge {
         font-size: 11px;
-        font-weight: 500;
+        font-weight: 600;
         padding: 3px 8px;
         border-radius: 9999px;
       }
@@ -116,7 +121,7 @@ export class AssistantOverlay {
         color: #064e3b;
         border: none;
         border-radius: 6px;
-        padding: 6px 10px;
+        padding: 7px 10px;
         font-size: 12px;
         font-weight: 700;
         cursor: pointer;
@@ -129,39 +134,68 @@ export class AssistantOverlay {
         background: #34d399;
       }
 
-      .unknown-list {
+      .section-box {
         margin-top: 10px;
         border-top: 1px solid #334155;
         padding-top: 10px;
-        max-height: 200px;
-        overflow-y: auto;
       }
-      .unknown-list-header {
+      .section-header {
         font-size: 11px;
         color: #94a3b8;
         margin-bottom: 6px;
         display: flex;
         justify-content: space-between;
         align-items: center;
+        font-weight: 600;
       }
-      .unknown-item {
+      .toggle-link {
+        color: #38bdf8;
+        font-size: 10px;
+        cursor: pointer;
+        background: none;
+        border: none;
+        padding: 0;
+      }
+      .toggle-link:hover {
+        text-decoration: underline;
+      }
+      .field-list {
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+        max-height: 160px;
+        overflow-y: auto;
+      }
+      .field-row {
         background: #1e293b;
         border: 1px solid #334155;
         border-radius: 6px;
-        padding: 8px 10px;
-        margin-bottom: 6px;
+        padding: 6px 10px;
         display: flex;
         align-items: center;
         justify-content: space-between;
-        font-size: 12px;
+        font-size: 11px;
         gap: 8px;
       }
-      .unknown-item-label {
-        max-width: 190px;
+      .field-label {
+        max-width: 170px;
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
         color: #f1f5f9;
+        font-weight: 500;
+      }
+      .field-value {
+        max-width: 130px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        color: #38bdf8;
+        font-weight: 600;
+        background: #0f172a;
+        padding: 2px 6px;
+        border-radius: 4px;
+        border: 1px solid #1e293b;
       }
       .teach-btn {
         background: #0284c7;
@@ -177,7 +211,7 @@ export class AssistantOverlay {
       .teach-btn:hover { background: #0369a1; }
       
       .toast {
-        background: #065f46;
+        background: #064e3b;
         color: #34d399;
         padding: 8px 10px;
         border-radius: 6px;
@@ -185,6 +219,19 @@ export class AssistantOverlay {
         margin-bottom: 10px;
         border: 1px solid #059669;
         display: none;
+        line-height: 1.4;
+      }
+
+      .all-good-box {
+        background: #064e3b;
+        border: 1px solid #059669;
+        border-radius: 6px;
+        padding: 8px 10px;
+        font-size: 12px;
+        color: #34d399;
+        text-align: center;
+        margin-top: 10px;
+        font-weight: 600;
       }
 
       .footer {
@@ -297,21 +344,46 @@ export class AssistantOverlay {
         </div>
 
         ${
-          options.unknownFields.length
-            ? `<div class="unknown-list">
-                <div class="unknown-list-header">
-                  <strong>Unknown & Review Fields (${options.unknownFields.length}):</strong>
+          remainingUnknown.length
+            ? `<div class="section-box">
+                <div class="section-header">
+                  <span style="color:#c084fc;">? Remaining to Teach (${remainingUnknown.length}):</span>
                 </div>
-                ${options.unknownFields
-                  .map(
-                    (f) => `
-                    <div class="unknown-item">
-                      <span class="unknown-item-label" title="${f.label}">${f.label}</span>
-                      <button class="teach-btn" data-id="${f.fieldId}">Teach</button>
-                    </div>
-                  `
-                  )
-                  .join("")}
+                <div class="field-list">
+                  ${remainingUnknown
+                    .map(
+                      (f) => `
+                      <div class="field-row">
+                        <span class="field-label" title="${f.label}">${f.label}</span>
+                        <button class="teach-btn" data-id="${f.fieldId}">Teach</button>
+                      </div>
+                    `
+                    )
+                    .join("")}
+                </div>
+              </div>`
+            : `<div class="all-good-box">✓ All fields on this page are taught & configured!</div>`
+        }
+
+        ${
+          filledItems.length
+            ? `<div class="section-box">
+                <div class="section-header">
+                  <span style="color:#34d399;">✓ Configured Fields & Values (${filledItems.length}):</span>
+                  <button class="toggle-link" id="toggle-filled-btn">Toggle View</button>
+                </div>
+                <div class="field-list" id="filled-list-container">
+                  ${filledItems
+                    .map(
+                      (item) => `
+                      <div class="field-row">
+                        <span class="field-label" title="${item.label}">${item.label}</span>
+                        <span class="field-value" title="${item.valueAttempted || 'Configured'}">${item.valueAttempted || '✓ Configured'}</span>
+                      </div>
+                    `
+                    )
+                    .join("")}
+                </div>
               </div>`
             : ""
         }
@@ -330,6 +402,14 @@ export class AssistantOverlay {
     const toast = card.querySelector<HTMLDivElement>("#toast-msg")!;
     const learnBtn = card.querySelector<HTMLButtonElement>("#learn-page-btn");
     const forgetBtn = card.querySelector<HTMLButtonElement>("#forget-btn");
+    const toggleFilledBtn = card.querySelector<HTMLButtonElement>("#toggle-filled-btn");
+    const filledListContainer = card.querySelector<HTMLDivElement>("#filled-list-container");
+
+    if (toggleFilledBtn && filledListContainer) {
+      toggleFilledBtn.addEventListener("click", () => {
+        filledListContainer.style.display = filledListContainer.style.display === "none" ? "flex" : "none";
+      });
+    }
 
     if (learnBtn) {
       learnBtn.addEventListener("click", async () => {
@@ -338,13 +418,17 @@ export class AssistantOverlay {
         try {
           const res = await options.onLearnPage();
           if (res && res.learnedCount > 0) {
-            toast.textContent = `✓ Successfully learned ${res.learnedCount} field(s) into your profile & mappings!`;
+            const allItems = res.profileFieldsUpdated.concat(res.mappingsCreated);
+            const breakdown = allItems.slice(0, 6).map((item) => `• ${item}`).join("<br/>");
+            const extra = allItems.length > 6 ? `<br/>...and ${allItems.length - 6} more` : "";
+            
+            toast.innerHTML = `<strong>✓ Learned ${res.learnedCount} Field(s):</strong><br/>${breakdown}${extra}`;
             toast.style.display = "block";
             setTimeout(() => {
               options.onRefill();
-            }, 1000);
+            }, 1200);
           } else {
-            toast.textContent = "No filled values detected on page yet. Type in your details first!";
+            toast.textContent = "No filled values detected on page yet. Type in your details on the form first!";
             toast.style.display = "block";
             learnBtn.textContent = "💾 Learn & Save Page to Profile";
             learnBtn.disabled = false;
@@ -363,7 +447,7 @@ export class AssistantOverlay {
         forgetBtn.textContent = "Resetting...";
         try {
           await options.onForgetPage();
-          toast.textContent = "✓ Reset form and forgot custom mappings for this page.";
+          toast.textContent = "✓ Reset form inputs and forgot custom mappings for this page.";
           toast.style.display = "block";
           setTimeout(() => {
             options.onRefill();
