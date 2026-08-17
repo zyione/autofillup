@@ -1,10 +1,12 @@
 import type { FieldFillResult, UnknownFieldInfo, UserProfile } from "../../shared/types";
+import type { LearnResult } from "../learning/page-learner";
 
 export interface OverlayOptions {
   outcomes: FieldFillResult[];
   unknownFields: UnknownFieldInfo[];
   profile: UserProfile;
   onTeach: (fieldId: string, source: any, valueOrPath: string, fixedValue?: string) => Promise<void>;
+  onLearnPage: () => Promise<LearnResult>;
   onClose: () => void;
   onRefill: () => void;
 }
@@ -34,7 +36,7 @@ export class AssistantOverlay {
         border-radius: 12px;
         box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.5);
         border: 1px solid #334155;
-        width: 320px;
+        width: 340px;
         overflow: hidden;
         animation: slideIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
       }
@@ -93,10 +95,52 @@ export class AssistantOverlay {
       .badge-unknown { background: #4c1d95; color: #c084fc; }
       .badge-skipped { background: #334155; color: #94a3b8; }
       
+      .learn-banner {
+        background: #064e3b;
+        border: 1px solid #059669;
+        border-radius: 8px;
+        padding: 10px 12px;
+        margin-bottom: 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .learn-banner span {
+        font-size: 11px;
+        color: #a7f3d0;
+      }
+      .learn-btn {
+        background: #10b981;
+        color: #064e3b;
+        border: none;
+        border-radius: 6px;
+        padding: 6px 10px;
+        font-size: 12px;
+        font-weight: 700;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+      }
+      .learn-btn:hover {
+        background: #34d399;
+      }
+
       .unknown-list {
         margin-top: 10px;
         border-top: 1px solid #334155;
         padding-top: 10px;
+        max-height: 200px;
+        overflow-y: auto;
+      }
+      .unknown-list-header {
+        font-size: 11px;
+        color: #94a3b8;
+        margin-bottom: 6px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
       }
       .unknown-item {
         background: #1e293b;
@@ -108,6 +152,14 @@ export class AssistantOverlay {
         align-items: center;
         justify-content: space-between;
         font-size: 12px;
+        gap: 8px;
+      }
+      .unknown-item-label {
+        max-width: 190px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        color: #f1f5f9;
       }
       .teach-btn {
         background: #0284c7;
@@ -117,9 +169,22 @@ export class AssistantOverlay {
         padding: 4px 8px;
         font-size: 11px;
         cursor: pointer;
-        font-weight: 500;
+        font-weight: 600;
+        white-space: nowrap;
       }
       .teach-btn:hover { background: #0369a1; }
+      
+      .toast {
+        background: #065f46;
+        color: #34d399;
+        padding: 8px 10px;
+        border-radius: 6px;
+        font-size: 11px;
+        margin-bottom: 10px;
+        border: 1px solid #059669;
+        display: none;
+      }
+
       .footer {
         padding: 10px 16px;
         background: #1e293b;
@@ -129,11 +194,6 @@ export class AssistantOverlay {
         border-top: 1px solid #334155;
         font-size: 11px;
       }
-      .footer a {
-        color: #38bdf8;
-        text-decoration: none;
-      }
-      .footer a:hover { text-decoration: underline; }
       .refill-btn {
         background: #334155;
         color: #f8fafc;
@@ -148,7 +208,7 @@ export class AssistantOverlay {
       .modal-backdrop {
         position: fixed;
         top: 0; left: 0; right: 0; bottom: 0;
-        background: rgba(0, 0, 0, 0.6);
+        background: rgba(0, 0, 0, 0.65);
         display: flex;
         align-items: center;
         justify-content: center;
@@ -161,6 +221,7 @@ export class AssistantOverlay {
         padding: 20px;
         width: 360px;
         color: #f8fafc;
+        box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.7);
       }
       .modal h4 { margin: 0 0 8px 0; color: #38bdf8; font-size: 15px; }
       .modal label { display: block; font-size: 12px; color: #94a3b8; margin-top: 10px; margin-bottom: 4px; }
@@ -188,17 +249,19 @@ export class AssistantOverlay {
         border: none;
       }
       .modal-btn-cancel { background: #334155; color: #fff; }
-      .modal-btn-save { background: #0284c7; color: #fff; font-weight: 500; }
+      .modal-btn-save { background: #0284c7; color: #fff; font-weight: 600; }
     `;
 
     const card = document.createElement("div");
     card.className = "card";
     card.innerHTML = `
       <div class="header">
-        <h3>AutoFillUp Assistant</h3>
+        <h3>⚡ AutoFillUp Assistant</h3>
         <button class="close-btn" title="Close status">×</button>
       </div>
       <div class="body">
+        <div id="toast-msg" class="toast"></div>
+
         <div class="stats">
           ${counts.filled ? `<span class="badge badge-filled">✓ ${counts.filled} Filled</span>` : ""}
           ${counts.review ? `<span class="badge badge-review">⚠ ${counts.review} Review</span>` : ""}
@@ -206,16 +269,23 @@ export class AssistantOverlay {
           ${counts.skipped ? `<span class="badge badge-skipped">${counts.skipped} Skipped</span>` : ""}
           ${!options.outcomes.length ? `<span class="badge badge-skipped">No inputs found</span>` : ""}
         </div>
+
+        <div class="learn-banner">
+          <span>💡 Fill this form on the page once, then click below:</span>
+          <button id="learn-page-btn" class="learn-btn">💾 Learn & Save Page to Profile</button>
+        </div>
+
         ${
           options.unknownFields.length
             ? `<div class="unknown-list">
-                <div style="font-size:11px;color:#94a3b8;margin-bottom:6px;">Unknown fields to teach:</div>
+                <div class="unknown-list-header">
+                  <strong>Unknown & Review Fields (${options.unknownFields.length}):</strong>
+                </div>
                 ${options.unknownFields
-                  .slice(0, 3)
                   .map(
                     (f) => `
                     <div class="unknown-item">
-                      <span title="${f.label}" style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${f.label}</span>
+                      <span class="unknown-item-label" title="${f.label}">${f.label}</span>
                       <button class="teach-btn" data-id="${f.fieldId}">Teach</button>
                     </div>
                   `
@@ -233,6 +303,35 @@ export class AssistantOverlay {
 
     this.shadow.appendChild(style);
     this.shadow.appendChild(card);
+
+    const toast = card.querySelector<HTMLDivElement>("#toast-msg")!;
+    const learnBtn = card.querySelector<HTMLButtonElement>("#learn-page-btn");
+
+    if (learnBtn) {
+      learnBtn.addEventListener("click", async () => {
+        learnBtn.disabled = true;
+        learnBtn.textContent = "Scanning & Learning...";
+        try {
+          const res = await options.onLearnPage();
+          if (res && res.learnedCount > 0) {
+            toast.textContent = `✓ Successfully learned ${res.learnedCount} field(s) into your profile & mappings!`;
+            toast.style.display = "block";
+            setTimeout(() => {
+              options.onRefill();
+            }, 1200);
+          } else {
+            toast.textContent = "No filled values detected on page yet. Type in your details first!";
+            toast.style.display = "block";
+            learnBtn.textContent = "💾 Learn & Save Page to Profile";
+            learnBtn.disabled = false;
+          }
+        } catch {
+          toast.textContent = "Error learning from page.";
+          toast.style.display = "block";
+          learnBtn.disabled = false;
+        }
+      });
+    }
 
     card.querySelector(".close-btn")?.addEventListener("click", () => this.remove());
     card.querySelector("#refill-btn")?.addEventListener("click", () => options.onRefill());
@@ -266,9 +365,9 @@ export class AssistantOverlay {
         <label>Mapping Type</label>
         <select id="source-type">
           <option value="profile">Personal / Contact Profile</option>
-          <option value="customField">Custom Profile Field</option>
+          <option value="fixedValue">Fixed Value (e.g. Yes, No, Custom text)</option>
           <option value="applicationAnswer">Application Answer</option>
-          <option value="fixedValue">Fixed Value</option>
+          <option value="customField">Custom Profile Field</option>
           <option value="ignore">Ignore Permanently</option>
         </select>
 
@@ -276,6 +375,7 @@ export class AssistantOverlay {
           <label>Profile Field</label>
           <select id="profile-path">
             <option value="personal.firstName">First Name</option>
+            <option value="personal.middleName">Middle Name</option>
             <option value="personal.lastName">Last Name</option>
             <option value="personal.preferredName">Preferred Name</option>
             <option value="contact.email">Email Address</option>
@@ -309,6 +409,7 @@ export class AssistantOverlay {
           <label>Profile Field</label>
           <select id="profile-path">
             <option value="personal.firstName">First Name</option>
+            <option value="personal.middleName">Middle Name</option>
             <option value="personal.lastName">Last Name</option>
             <option value="personal.preferredName">Preferred Name</option>
             <option value="contact.email">Email Address</option>
@@ -347,7 +448,7 @@ export class AssistantOverlay {
       } else if (type === "fixedValue") {
         dynamicInputs.innerHTML = `
           <label>Fixed Value</label>
-          <input type="text" id="fixed-val-input" placeholder="e.g. Yes, No, or standard text"/>
+          <input type="text" id="fixed-val-input" placeholder="e.g. Yes, No, or answer text" value=""/>
         `;
       } else {
         dynamicInputs.innerHTML = `<p style="font-size:12px;color:#94a3b8;margin-top:10px;">This field will be skipped automatically on future scans.</p>`;

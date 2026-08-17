@@ -161,7 +161,7 @@ body {
   border-radius: 8px;
   border: none;
   cursor: pointer;
-  transition: background 0.15s ease;
+  transition: background 0.15s ease, opacity 0.15s ease;
 }
 
 .btn-primary {
@@ -176,6 +176,17 @@ body {
 .btn-primary:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+.btn-learn {
+  background: #065f46;
+  color: #34d399;
+  border: 1px solid #059669;
+}
+
+.btn-learn:hover:not(:disabled) {
+  background: #047857;
+  color: #fff;
 }
 
 .btn-secondary {

@@ -1,5 +1,5 @@
 import "./popup.css";
-import type { StatusResponse } from "../shared/messages";
+import type { StatusResponse, LearnPageResponse } from "../shared/messages";
 
 const siteBadge = document.querySelector<HTMLDivElement>("#site-badge")!;
 const pageInfo = document.querySelector<HTMLDivElement>("#page-info")!;
@@ -12,6 +12,7 @@ const cntReview = document.querySelector<HTMLElement>("#cnt-review")!;
 const cntUnknown = document.querySelector<HTMLElement>("#cnt-unknown")!;
 const cntSkipped = document.querySelector<HTMLElement>("#cnt-skipped")!;
 const autofillBtn = document.querySelector<HTMLButtonElement>("#autofill-btn")!;
+const learnPageBtn = document.querySelector<HTMLButtonElement>("#learn-page-btn")!;
 const reviewBtn = document.querySelector<HTMLButtonElement>("#review-btn")!;
 const openOptionsBtn = document.querySelector<HTMLButtonElement>("#open-options-btn")!;
 
@@ -66,15 +67,17 @@ async function initPopup(): Promise<void> {
 
     if (!response || !response.supported) {
       if (isWorkdayHost) {
-        siteBadge.textContent = "Workday Detected";
+        siteBadge.textContent = "Workday Ready";
         siteBadge.className = "site-badge active";
-        statusMsg.textContent = "Please refresh this Workday tab (press F5 / Ctrl+R) to activate the assistant.";
+        statusMsg.textContent = "Click 'Autofill Page' to scan fields, or fill inputs on the page and click 'Learn'.";
         autofillBtn.disabled = false;
+        learnPageBtn.style.display = "block";
       } else {
         siteBadge.textContent = "Not Workday";
         siteBadge.className = "site-badge inactive";
         statusMsg.textContent = "Open a supported Workday application page to activate autofill.";
         autofillBtn.disabled = true;
+        learnPageBtn.style.display = "none";
       }
       return;
     }
@@ -82,6 +85,7 @@ async function initPopup(): Promise<void> {
     siteBadge.textContent = "Workday Ready";
     siteBadge.className = "site-badge active";
     autofillBtn.disabled = false;
+    learnPageBtn.style.display = "block";
 
     pageInfo.style.display = "block";
     tenantName.textContent = `Tenant: ${response.tenant || "Workday"}`;
@@ -103,6 +107,7 @@ async function initPopup(): Promise<void> {
             siteBadge.textContent = "Workday Ready";
             siteBadge.className = "site-badge active";
             autofillBtn.disabled = false;
+            learnPageBtn.style.display = "block";
             pageInfo.style.display = "block";
             tenantName.textContent = `Tenant: ${retryRes.tenant || "Workday"}`;
             pageName.textContent = retryRes.currentPage || "Application Form";
@@ -113,20 +118,20 @@ async function initPopup(): Promise<void> {
             }
             return;
           }
-        } catch {
-          // fallback to refresh message
-        }
+        } catch {}
       }
 
-      siteBadge.textContent = "Workday Detected";
+      siteBadge.textContent = "Workday Ready";
       siteBadge.className = "site-badge active";
-      statusMsg.textContent = "Please refresh this Workday tab (press F5 or Ctrl+R) to connect the assistant.";
+      statusMsg.textContent = "Click 'Autofill Page' or refresh the tab if needed.";
       autofillBtn.disabled = false;
+      learnPageBtn.style.display = "block";
     } else {
       siteBadge.textContent = "Not Workday";
       siteBadge.className = "site-badge inactive";
       statusMsg.textContent = "Open a Workday application to begin.";
       autofillBtn.disabled = true;
+      learnPageBtn.style.display = "none";
     }
   }
 }
@@ -143,11 +148,12 @@ function updateMetrics(response: StatusResponse): void {
   cntSkipped.textContent = String(counts.skipped ?? 0);
 
   metricsGrid.style.display = "grid";
-  statusMsg.textContent = `${response.outcomes.length} field(s) analyzed. Review fields before proceeding.`;
+  statusMsg.textContent = `${response.outcomes.length} field(s) analyzed. Review fields or learn from page below.`;
 
-  if (counts.unknown && counts.unknown > 0) {
+  const unknownOrReview = (counts.unknown ?? 0) + (counts.review ?? 0);
+  if (unknownOrReview > 0) {
     reviewBtn.style.display = "block";
-    reviewBtn.textContent = `Teach ${counts.unknown} Unknown Field(s)`;
+    reviewBtn.textContent = `Teach ${unknownOrReview} Field(s)`;
   } else {
     reviewBtn.style.display = "none";
   }
@@ -168,7 +174,6 @@ autofillBtn.addEventListener("click", async () => {
         showOverlay: true
       })) as StatusResponse | undefined;
     } catch {
-      // Content script may not be loaded; attempt injection then retry
       await ensureContentScript(tab.id);
       response = (await chrome.tabs.sendMessage(tab.id, {
         type: "RUN_AUTOFILL",
@@ -188,6 +193,41 @@ autofillBtn.addEventListener("click", async () => {
     statusMsg.textContent = "Could not connect to page. Please reload the Workday tab (F5) and try again.";
   } finally {
     autofillBtn.disabled = false;
+  }
+});
+
+learnPageBtn.addEventListener("click", async () => {
+  const tab = await queryActiveTab();
+  if (!tab || !tab.id) return;
+
+  learnPageBtn.disabled = true;
+  statusMsg.textContent = "Scanning page inputs to learn values...";
+
+  try {
+    let res: LearnPageResponse | undefined;
+    try {
+      res = (await chrome.tabs.sendMessage(tab.id, {
+        type: "LEARN_PAGE"
+      })) as LearnPageResponse | undefined;
+    } catch {
+      await ensureContentScript(tab.id);
+      res = (await chrome.tabs.sendMessage(tab.id, {
+        type: "LEARN_PAGE"
+      })) as LearnPageResponse | undefined;
+    }
+
+    if (res && res.learnedCount > 0) {
+      statusMsg.textContent = `✓ Learned ${res.learnedCount} field(s) from this page into your profile & mappings!`;
+      setTimeout(() => {
+        void initPopup();
+      }, 1200);
+    } else {
+      statusMsg.textContent = "No filled values detected on page. Fill out your details on the form first, then click Learn!";
+    }
+  } catch {
+    statusMsg.textContent = "Could not learn from page. Please refresh the page.";
+  } finally {
+    learnPageBtn.disabled = false;
   }
 });
 

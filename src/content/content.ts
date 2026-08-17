@@ -5,6 +5,7 @@ import { scanFields } from "./fields/field-detector";
 import { MappingEngine } from "./mapping/mapping-engine";
 import { executeAutofillField } from "./autofill/autofill-engine";
 import { TeachingController } from "./learning/teaching-controller";
+import { learnCurrentPageValues } from "./learning/page-learner";
 import { AssistantOverlay } from "./ui/overlay";
 import { ProfileStore } from "../storage/profile-store";
 import { MappingStore } from "../storage/mapping-store";
@@ -47,13 +48,18 @@ async function runAutofill(showOverlayUI = true): Promise<{ outcomes: FieldFillR
 
     for (const field of fields) {
       const candidate = mappingEngine.resolve(field);
-
-      if (candidate.source === "builtin" && candidate.confidence === 0) {
-        teachingController.registerUnknown(field);
-      }
-
       const result = await executeAutofillField(field, candidate, settings.overwriteExisting);
       outcomes.push(result);
+
+      // Register for teaching if unknown, review, confidence 0, or missing value
+      if (
+        result.outcome === "unknown" ||
+        result.outcome === "review" ||
+        candidate.confidence === 0 ||
+        !candidate.value
+      ) {
+        teachingController.registerUnknown(field);
+      }
     }
 
     lastOutcomes = outcomes;
@@ -66,6 +72,9 @@ async function runAutofill(showOverlayUI = true): Promise<{ outcomes: FieldFillR
         profile,
         onTeach: async (fieldId, source, pathOrVal, fixedVal) => {
           await teachingController.teachField(fieldId, source, pathOrVal, fixedVal);
+        },
+        onLearnPage: async () => {
+          return await learnCurrentPageValues(document, profileStore, mappingStore);
         },
         onClose: () => overlay.remove(),
         onRefill: () => void runAutofill(true)
@@ -130,6 +139,20 @@ try {
               currentPage: detectPageFingerprint(location, document).heading,
               outcomes,
               unknownFields: unknown
+            });
+          } catch {}
+        });
+        return true;
+      }
+
+      if (message.type === messageTypes.learnPage || message.type === "LEARN_PAGE") {
+        void learnCurrentPageValues(document, profileStore, mappingStore).then((res) => {
+          try {
+            sendResponse({
+              success: true,
+              learnedCount: res.learnedCount,
+              profileFieldsUpdated: res.profileFieldsUpdated,
+              mappingsCreated: res.mappingsCreated
             });
           } catch {}
         });
