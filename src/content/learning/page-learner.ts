@@ -160,3 +160,53 @@ export async function learnCurrentPageValues(
     mappingsCreated
   };
 }
+
+export async function forgetCurrentPage(
+  doc: Document = document,
+  profileStore: ProfileStore = new ProfileStore(),
+  mappingStore: MappingStore = new MappingStore()
+): Promise<{ removedCount: number }> {
+  const fields = scanFields(doc);
+  const labels = fields.map((f) => f.fingerprint.label || f.rawLabel || "").filter(Boolean);
+
+  // 1. Remove custom learned mappings for these fields
+  const removedCount = await mappingStore.removeByLabels(labels);
+
+  // 2. Remove application answers matching these field labels
+  const profile = await profileStore.get();
+  const labelSet = new Set(labels.map((l) => l.toLowerCase().trim()));
+  const origAnswerLen = profile.applicationAnswers.length;
+  profile.applicationAnswers = profile.applicationAnswers.filter(
+    (a) => !labelSet.has(a.name.toLowerCase().trim())
+  );
+  if (profile.applicationAnswers.length !== origAnswerLen) {
+    await profileStore.save(profile);
+  }
+
+  // 3. Clear the input values on the page so user can start fresh
+  for (const field of fields) {
+    const el = field.element;
+    if (!el) continue;
+    try {
+      if (el instanceof HTMLInputElement && (el.type === "checkbox" || el.type === "radio")) {
+        el.checked = false;
+        el.dispatchEvent(new Event("input", { bubbles: true }));
+        el.dispatchEvent(new Event("change", { bubbles: true }));
+      } else if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) {
+        el.value = "";
+        el.dispatchEvent(new Event("input", { bubbles: true }));
+        el.dispatchEvent(new Event("change", { bubbles: true }));
+      } else if (el instanceof HTMLSelectElement) {
+        el.selectedIndex = 0;
+        el.dispatchEvent(new Event("change", { bubbles: true }));
+      } else if (field.fingerprint.kind === "radioGroup") {
+        el.querySelectorAll<HTMLInputElement>("input[type='radio']").forEach((r) => {
+          r.checked = false;
+          r.dispatchEvent(new Event("change", { bubbles: true }));
+        });
+      }
+    } catch {}
+  }
+
+  return { removedCount };
+}

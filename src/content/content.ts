@@ -5,7 +5,7 @@ import { scanFields } from "./fields/field-detector";
 import { MappingEngine } from "./mapping/mapping-engine";
 import { executeAutofillField } from "./autofill/autofill-engine";
 import { TeachingController } from "./learning/teaching-controller";
-import { learnCurrentPageValues } from "./learning/page-learner";
+import { learnCurrentPageValues, forgetCurrentPage } from "./learning/page-learner";
 import { AssistantOverlay } from "./ui/overlay";
 import { ProfileStore } from "../storage/profile-store";
 import { MappingStore } from "../storage/mapping-store";
@@ -75,6 +75,9 @@ async function runAutofill(showOverlayUI = true): Promise<{ outcomes: FieldFillR
         },
         onLearnPage: async () => {
           return await learnCurrentPageValues(document, profileStore, mappingStore);
+        },
+        onForgetPage: async () => {
+          return await forgetCurrentPage(document, profileStore, mappingStore);
         },
         onClose: () => overlay.remove(),
         onRefill: () => void runAutofill(true)
@@ -153,6 +156,18 @@ try {
               learnedCount: res.learnedCount,
               profileFieldsUpdated: res.profileFieldsUpdated,
               mappingsCreated: res.mappingsCreated
+            });
+          } catch {}
+        });
+        return true;
+      }
+
+      if (message.type === messageTypes.forgetPage || message.type === "FORGET_PAGE") {
+        void forgetCurrentPage(document, profileStore, mappingStore).then((res) => {
+          try {
+            sendResponse({
+              success: true,
+              removedCount: res.removedCount
             });
           } catch {}
         });

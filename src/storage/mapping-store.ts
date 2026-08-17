@@ -33,6 +33,17 @@ export class MappingStore {
     await this.storage.set(key, all.filter((item) => item.id !== id));
   }
 
+  async removeByLabels(labels: string[]): Promise<number> {
+    const all = await this.list();
+    const normalizedSet = new Set(labels.map((l) => l.toLowerCase().trim()));
+    const remaining = all.filter((item) => !normalizedSet.has(item.fingerprint.label.toLowerCase().trim()));
+    const removedCount = all.length - remaining.length;
+    if (removedCount > 0) {
+      await this.storage.set(key, remaining);
+    }
+    return removedCount;
+  }
+
   async toggleEnabled(id: string, enabled: boolean): Promise<void> {
     const all = await this.list();
     const mapping = all.find((item) => item.id === id);

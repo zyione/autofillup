@@ -8,6 +8,7 @@ export interface OverlayOptions {
   profile: UserProfile;
   onTeach: (fieldId: string, source: any, valueOrPath: string, fixedValue?: string, enteredValue?: string) => Promise<void>;
   onLearnPage: () => Promise<LearnResult>;
+  onForgetPage: () => Promise<{ removedCount: number }>;
   onClose: () => void;
   onRefill: () => void;
 }
@@ -194,6 +195,11 @@ export class AssistantOverlay {
         align-items: center;
         border-top: 1px solid #334155;
         font-size: 11px;
+        gap: 6px;
+      }
+      .footer-actions {
+        display: flex;
+        gap: 6px;
       }
       .refill-btn {
         background: #334155;
@@ -204,6 +210,20 @@ export class AssistantOverlay {
         cursor: pointer;
       }
       .refill-btn:hover { background: #475569; }
+
+      .forget-btn {
+        background: transparent;
+        color: #f87171;
+        border: 1px solid #7f1d1d;
+        border-radius: 4px;
+        padding: 4px 8px;
+        cursor: pointer;
+        font-size: 11px;
+      }
+      .forget-btn:hover {
+        background: #991b1b;
+        color: #fff;
+      }
 
       /* Modal for Teaching */
       .modal-backdrop {
@@ -297,8 +317,10 @@ export class AssistantOverlay {
         }
       </div>
       <div class="footer">
-        <button class="refill-btn" id="refill-btn">Rescan & Fill</button>
-        <span style="color:#64748b;">Privacy-First Local</span>
+        <button class="forget-btn" id="forget-btn" title="Clear form inputs and forget custom mappings for this page">🔄 Forget Page</button>
+        <div class="footer-actions">
+          <button class="refill-btn" id="refill-btn">Rescan & Fill</button>
+        </div>
       </div>
     `;
 
@@ -307,6 +329,7 @@ export class AssistantOverlay {
 
     const toast = card.querySelector<HTMLDivElement>("#toast-msg")!;
     const learnBtn = card.querySelector<HTMLButtonElement>("#learn-page-btn");
+    const forgetBtn = card.querySelector<HTMLButtonElement>("#forget-btn");
 
     if (learnBtn) {
       learnBtn.addEventListener("click", async () => {
@@ -334,6 +357,25 @@ export class AssistantOverlay {
       });
     }
 
+    if (forgetBtn) {
+      forgetBtn.addEventListener("click", async () => {
+        forgetBtn.disabled = true;
+        forgetBtn.textContent = "Resetting...";
+        try {
+          await options.onForgetPage();
+          toast.textContent = "✓ Reset form and forgot custom mappings for this page.";
+          toast.style.display = "block";
+          setTimeout(() => {
+            options.onRefill();
+          }, 800);
+        } catch {
+          toast.textContent = "Error resetting page.";
+          toast.style.display = "block";
+          forgetBtn.disabled = false;
+        }
+      });
+    }
+
     card.querySelector(".close-btn")?.addEventListener("click", () => this.remove());
     card.querySelector("#refill-btn")?.addEventListener("click", () => options.onRefill());
 
@@ -356,7 +398,6 @@ export class AssistantOverlay {
   private showTeachModal(field: UnknownFieldInfo, options: OverlayOptions): void {
     if (!this.shadow) return;
 
-    // Detect if the element on page currently has a value
     let pageCurrentValue = "";
     try {
       const el = document.getElementById(field.fieldId) || document.querySelector(`[name="${CSS.escape(field.fieldId)}"]`);
@@ -365,7 +406,6 @@ export class AssistantOverlay {
       }
     } catch {}
 
-    // Best guess initial profile path
     let defaultProfilePath = "personal.firstName";
     const labelLower = field.label.toLowerCase();
     if (labelLower.includes("last")) defaultProfilePath = "personal.lastName";

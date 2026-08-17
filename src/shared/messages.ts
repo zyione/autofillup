@@ -8,6 +8,7 @@ export const messageTypes = {
   statusResponse: "STATUS_RESPONSE",
   teachField: "TEACH_FIELD",
   learnPage: "LEARN_PAGE",
+  forgetPage: "FORGET_PAGE",
   saveMapping: "SAVE_MAPPING",
   pageChanged: "PAGE_CHANGED",
   getProfile: "GET_PROFILE",
@@ -29,6 +30,10 @@ export interface GetStatusMessage {
 
 export interface LearnPageMessage {
   type: typeof messageTypes.learnPage;
+}
+
+export interface ForgetPageMessage {
+  type: typeof messageTypes.forgetPage;
 }
 
 export interface TeachFieldMessage {
@@ -57,11 +62,17 @@ export interface LearnPageResponse {
   mappingsCreated: string[];
 }
 
+export interface ForgetPageResponse {
+  success: boolean;
+  removedCount: number;
+}
+
 export type ExtensionMessage =
   | PingMessage
   | RunAutofillMessage
   | GetStatusMessage
   | LearnPageMessage
+  | ForgetPageMessage
   | TeachFieldMessage
   | SaveMappingMessage;
 

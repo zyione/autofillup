@@ -198,6 +198,19 @@ body {
   background: #475569;
 }
 
+.btn-danger-outline {
+  background: transparent;
+  color: #f87171;
+  border: 1px solid #7f1d1d;
+  font-size: 11px;
+  padding: 6px;
+}
+
+.btn-danger-outline:hover {
+  background: #7f1d1d;
+  color: #fff;
+}
+
 .popup-footer {
   margin-top: 14px;
   padding-top: 10px;

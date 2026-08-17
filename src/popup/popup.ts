@@ -1,5 +1,5 @@
 import "./popup.css";
-import type { StatusResponse, LearnPageResponse } from "../shared/messages";
+import type { StatusResponse, LearnPageResponse, ForgetPageResponse } from "../shared/messages";
 
 const siteBadge = document.querySelector<HTMLDivElement>("#site-badge")!;
 const pageInfo = document.querySelector<HTMLDivElement>("#page-info")!;
@@ -14,6 +14,7 @@ const cntSkipped = document.querySelector<HTMLElement>("#cnt-skipped")!;
 const autofillBtn = document.querySelector<HTMLButtonElement>("#autofill-btn")!;
 const learnPageBtn = document.querySelector<HTMLButtonElement>("#learn-page-btn")!;
 const reviewBtn = document.querySelector<HTMLButtonElement>("#review-btn")!;
+const forgetPageBtn = document.querySelector<HTMLButtonElement>("#forget-page-btn")!;
 const openOptionsBtn = document.querySelector<HTMLButtonElement>("#open-options-btn")!;
 
 async function queryActiveTab(): Promise<chrome.tabs.Tab | undefined> {
@@ -72,12 +73,14 @@ async function initPopup(): Promise<void> {
         statusMsg.textContent = "Click 'Autofill Page' to scan fields, or fill inputs on the page and click 'Learn'.";
         autofillBtn.disabled = false;
         learnPageBtn.style.display = "block";
+        if (forgetPageBtn) forgetPageBtn.style.display = "block";
       } else {
         siteBadge.textContent = "Not Workday";
         siteBadge.className = "site-badge inactive";
         statusMsg.textContent = "Open a supported Workday application page to activate autofill.";
         autofillBtn.disabled = true;
         learnPageBtn.style.display = "none";
+        if (forgetPageBtn) forgetPageBtn.style.display = "none";
       }
       return;
     }
@@ -86,6 +89,7 @@ async function initPopup(): Promise<void> {
     siteBadge.className = "site-badge active";
     autofillBtn.disabled = false;
     learnPageBtn.style.display = "block";
+    if (forgetPageBtn) forgetPageBtn.style.display = "block";
 
     pageInfo.style.display = "block";
     tenantName.textContent = `Tenant: ${response.tenant || "Workday"}`;
@@ -108,6 +112,7 @@ async function initPopup(): Promise<void> {
             siteBadge.className = "site-badge active";
             autofillBtn.disabled = false;
             learnPageBtn.style.display = "block";
+            if (forgetPageBtn) forgetPageBtn.style.display = "block";
             pageInfo.style.display = "block";
             tenantName.textContent = `Tenant: ${retryRes.tenant || "Workday"}`;
             pageName.textContent = retryRes.currentPage || "Application Form";
@@ -126,12 +131,14 @@ async function initPopup(): Promise<void> {
       statusMsg.textContent = "Click 'Autofill Page' or refresh the tab if needed.";
       autofillBtn.disabled = false;
       learnPageBtn.style.display = "block";
+      if (forgetPageBtn) forgetPageBtn.style.display = "block";
     } else {
       siteBadge.textContent = "Not Workday";
       siteBadge.className = "site-badge inactive";
       statusMsg.textContent = "Open a Workday application to begin.";
       autofillBtn.disabled = true;
       learnPageBtn.style.display = "none";
+      if (forgetPageBtn) forgetPageBtn.style.display = "none";
     }
   }
 }
@@ -230,6 +237,39 @@ learnPageBtn.addEventListener("click", async () => {
     learnPageBtn.disabled = false;
   }
 });
+
+if (forgetPageBtn) {
+  forgetPageBtn.addEventListener("click", async () => {
+    const tab = await queryActiveTab();
+    if (!tab || !tab.id) return;
+
+    forgetPageBtn.disabled = true;
+    statusMsg.textContent = "Resetting and forgetting page mappings...";
+
+    try {
+      let res: ForgetPageResponse | undefined;
+      try {
+        res = (await chrome.tabs.sendMessage(tab.id, {
+          type: "FORGET_PAGE"
+        })) as ForgetPageResponse | undefined;
+      } catch {
+        await ensureContentScript(tab.id);
+        res = (await chrome.tabs.sendMessage(tab.id, {
+          type: "FORGET_PAGE"
+        })) as ForgetPageResponse | undefined;
+      }
+
+      statusMsg.textContent = `✓ Reset inputs and cleared custom mappings for this page.`;
+      setTimeout(() => {
+        void initPopup();
+      }, 1000);
+    } catch {
+      statusMsg.textContent = "Could not reset page mappings.";
+    } finally {
+      forgetPageBtn.disabled = false;
+    }
+  });
+}
 
 reviewBtn.addEventListener("click", async () => {
   const tab = await queryActiveTab();
