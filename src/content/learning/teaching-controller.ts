@@ -32,6 +32,10 @@ export class TeachingController {
     return Array.from(this.unknownQueue.values()).map((item) => item.info);
   }
 
+  getDescriptor(fieldId: string): FieldDescriptor | undefined {
+    return this.unknownQueue.get(fieldId)?.descriptor;
+  }
+
   clearQueue(): void {
     this.unknownQueue.clear();
   }
@@ -40,7 +44,8 @@ export class TeachingController {
     fieldId: string,
     mappingSource: "profile" | "customField" | "applicationAnswer" | "fixedValue" | "ignore",
     valueOrPath: string,
-    fixedValue?: string
+    fixedValue?: string,
+    enteredValue?: string
   ): Promise<FieldMapping | null> {
     const entry = this.unknownQueue.get(fieldId);
     if (!entry) return null;
@@ -48,12 +53,35 @@ export class TeachingController {
     const { descriptor } = entry;
     const now = new Date().toISOString();
 
+    // 1. If mapping to personal/contact profile and a value was provided, persist to profile
+    if (mappingSource === "profile" && enteredValue && enteredValue.trim().length > 0) {
+      const profile = await this.profileStore.get();
+      const parts = valueOrPath.split(".");
+      if (parts.length === 2) {
+        const [section, field] = parts as [keyof typeof profile, string];
+        if (profile[section] && typeof profile[section] === "object") {
+          (profile[section] as any)[field] = enteredValue.trim();
+          await this.profileStore.save(profile);
+        }
+      }
+    }
+
+    // 2. If mapping to application answers and a value was provided, persist to application answers
+    if (mappingSource === "applicationAnswer") {
+      const profile = await this.profileStore.get();
+      const existingIdx = profile.applicationAnswers.findIndex((a) => a.id === valueOrPath);
+      if (existingIdx >= 0 && enteredValue && enteredValue.trim().length > 0) {
+        profile.applicationAnswers[existingIdx].value = enteredValue.trim();
+        await this.profileStore.save(profile);
+      }
+    }
+
     const newMapping: FieldMapping = {
       id: typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `mapping-${Date.now()}`,
       fingerprint: descriptor.fingerprint,
       source: mappingSource,
       sourcePath: mappingSource !== "fixedValue" && mappingSource !== "ignore" ? valueOrPath : undefined,
-      fixedValue: mappingSource === "fixedValue" ? fixedValue || valueOrPath : undefined,
+      fixedValue: mappingSource === "fixedValue" ? fixedValue || enteredValue || valueOrPath : undefined,
       tenantScope: "*",
       enabled: true,
       createdAt: now,

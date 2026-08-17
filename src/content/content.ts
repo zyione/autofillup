@@ -70,8 +70,8 @@ async function runAutofill(showOverlayUI = true): Promise<{ outcomes: FieldFillR
         outcomes,
         unknownFields: unknownList,
         profile,
-        onTeach: async (fieldId, source, pathOrVal, fixedVal) => {
-          await teachingController.teachField(fieldId, source, pathOrVal, fixedVal);
+        onTeach: async (fieldId, source, pathOrVal, fixedVal, enteredVal) => {
+          await teachingController.teachField(fieldId, source, pathOrVal, fixedVal, enteredVal);
         },
         onLearnPage: async () => {
           return await learnCurrentPageValues(document, profileStore, mappingStore);

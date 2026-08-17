@@ -1,11 +1,12 @@
 import type { FieldFillResult, UnknownFieldInfo, UserProfile } from "../../shared/types";
 import type { LearnResult } from "../learning/page-learner";
+import { getProfileValueByPath } from "../mapping/mapping-engine";
 
 export interface OverlayOptions {
   outcomes: FieldFillResult[];
   unknownFields: UnknownFieldInfo[];
   profile: UserProfile;
-  onTeach: (fieldId: string, source: any, valueOrPath: string, fixedValue?: string) => Promise<void>;
+  onTeach: (fieldId: string, source: any, valueOrPath: string, fixedValue?: string, enteredValue?: string) => Promise<void>;
   onLearnPage: () => Promise<LearnResult>;
   onClose: () => void;
   onRefill: () => void;
@@ -318,7 +319,7 @@ export class AssistantOverlay {
             toast.style.display = "block";
             setTimeout(() => {
               options.onRefill();
-            }, 1200);
+            }, 1000);
           } else {
             toast.textContent = "No filled values detected on page yet. Type in your details first!";
             toast.style.display = "block";
@@ -355,17 +356,45 @@ export class AssistantOverlay {
   private showTeachModal(field: UnknownFieldInfo, options: OverlayOptions): void {
     if (!this.shadow) return;
 
+    // Detect if the element on page currently has a value
+    let pageCurrentValue = "";
+    try {
+      const el = document.getElementById(field.fieldId) || document.querySelector(`[name="${CSS.escape(field.fieldId)}"]`);
+      if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) {
+        pageCurrentValue = el.value.trim();
+      }
+    } catch {}
+
+    // Best guess initial profile path
+    let defaultProfilePath = "personal.firstName";
+    const labelLower = field.label.toLowerCase();
+    if (labelLower.includes("last")) defaultProfilePath = "personal.lastName";
+    else if (labelLower.includes("middle")) defaultProfilePath = "personal.middleName";
+    else if (labelLower.includes("email") || labelLower.includes("e-mail")) defaultProfilePath = "contact.email";
+    else if (labelLower.includes("phone") || labelLower.includes("mobile") || labelLower.includes("cell")) defaultProfilePath = "contact.phone";
+    else if (labelLower.includes("address") || labelLower.includes("street")) defaultProfilePath = "contact.address";
+    else if (labelLower.includes("city")) defaultProfilePath = "contact.city";
+    else if (labelLower.includes("state") || labelLower.includes("province")) defaultProfilePath = "contact.state";
+    else if (labelLower.includes("zip") || labelLower.includes("postal")) defaultProfilePath = "contact.postalCode";
+    else if (labelLower.includes("country")) defaultProfilePath = "contact.country";
+    else if (labelLower.includes("linkedin")) defaultProfilePath = "professional.linkedin";
+    else if (labelLower.includes("github")) defaultProfilePath = "professional.github";
+    else if (labelLower.includes("portfolio")) defaultProfilePath = "professional.portfolio";
+    else if (labelLower.includes("website")) defaultProfilePath = "professional.website";
+
+    const currentProfileVal = getProfileValueByPath(options.profile, defaultProfilePath) || pageCurrentValue;
+
     const modalBackdrop = document.createElement("div");
     modalBackdrop.className = "modal-backdrop";
     modalBackdrop.innerHTML = `
       <div class="modal">
         <h4>Teach Field: "${field.label}"</h4>
-        <p style="font-size:12px;color:#94a3b8;margin:0 0 12px 0;">Select what profile value or answer should fill this Workday field in the future.</p>
+        <p style="font-size:12px;color:#94a3b8;margin:0 0 12px 0;">Configure how AutoFillUp should fill this field now and in future applications.</p>
         
-        <label>Mapping Type</label>
+        <label>Mapping Target</label>
         <select id="source-type">
           <option value="profile">Personal / Contact Profile</option>
-          <option value="fixedValue">Fixed Value (e.g. Yes, No, Custom text)</option>
+          <option value="fixedValue">Fixed Value (Exact Answer)</option>
           <option value="applicationAnswer">Application Answer</option>
           <option value="customField">Custom Profile Field</option>
           <option value="ignore">Ignore Permanently</option>
@@ -374,27 +403,30 @@ export class AssistantOverlay {
         <div id="dynamic-inputs">
           <label>Profile Field</label>
           <select id="profile-path">
-            <option value="personal.firstName">First Name</option>
-            <option value="personal.middleName">Middle Name</option>
-            <option value="personal.lastName">Last Name</option>
-            <option value="personal.preferredName">Preferred Name</option>
-            <option value="contact.email">Email Address</option>
-            <option value="contact.phone">Phone Number</option>
-            <option value="contact.address">Address Line</option>
-            <option value="contact.city">City</option>
-            <option value="contact.state">State / Province</option>
-            <option value="contact.postalCode">Postal Code</option>
-            <option value="contact.country">Country</option>
-            <option value="professional.linkedin">LinkedIn</option>
-            <option value="professional.github">GitHub</option>
-            <option value="professional.portfolio">Portfolio</option>
-            <option value="professional.website">Website</option>
+            <option value="personal.firstName" ${defaultProfilePath === "personal.firstName" ? "selected" : ""}>First Name</option>
+            <option value="personal.middleName" ${defaultProfilePath === "personal.middleName" ? "selected" : ""}>Middle Name</option>
+            <option value="personal.lastName" ${defaultProfilePath === "personal.lastName" ? "selected" : ""}>Last Name</option>
+            <option value="personal.preferredName" ${defaultProfilePath === "personal.preferredName" ? "selected" : ""}>Preferred Name</option>
+            <option value="contact.email" ${defaultProfilePath === "contact.email" ? "selected" : ""}>Email Address</option>
+            <option value="contact.phone" ${defaultProfilePath === "contact.phone" ? "selected" : ""}>Phone Number</option>
+            <option value="contact.address" ${defaultProfilePath === "contact.address" ? "selected" : ""}>Address Line</option>
+            <option value="contact.city" ${defaultProfilePath === "contact.city" ? "selected" : ""}>City</option>
+            <option value="contact.state" ${defaultProfilePath === "contact.state" ? "selected" : ""}>State / Province</option>
+            <option value="contact.postalCode" ${defaultProfilePath === "contact.postalCode" ? "selected" : ""}>Postal Code</option>
+            <option value="contact.country" ${defaultProfilePath === "contact.country" ? "selected" : ""}>Country</option>
+            <option value="professional.linkedin" ${defaultProfilePath === "professional.linkedin" ? "selected" : ""}>LinkedIn</option>
+            <option value="professional.github" ${defaultProfilePath === "professional.github" ? "selected" : ""}>GitHub</option>
+            <option value="professional.portfolio" ${defaultProfilePath === "professional.portfolio" ? "selected" : ""}>Portfolio</option>
+            <option value="professional.website" ${defaultProfilePath === "professional.website" ? "selected" : ""}>Website</option>
           </select>
+
+          <label style="margin-top:8px;">Value to save for this profile field:</label>
+          <input type="text" id="entered-val-input" placeholder="e.g. Jane" value="${currentProfileVal}"/>
         </div>
 
         <div class="modal-actions">
           <button class="modal-btn modal-btn-cancel" id="modal-cancel">Cancel</button>
-          <button class="modal-btn modal-btn-save" id="modal-save">Save & Map</button>
+          <button class="modal-btn modal-btn-save" id="modal-save">Save & Fill</button>
         </div>
       </div>
     `;
@@ -402,29 +434,42 @@ export class AssistantOverlay {
     const sourceType = modalBackdrop.querySelector<HTMLSelectElement>("#source-type")!;
     const dynamicInputs = modalBackdrop.querySelector<HTMLDivElement>("#dynamic-inputs")!;
 
-    sourceType.addEventListener("change", () => {
-      const type = sourceType.value;
+    const renderInputsForType = (type: string) => {
       if (type === "profile") {
         dynamicInputs.innerHTML = `
           <label>Profile Field</label>
           <select id="profile-path">
-            <option value="personal.firstName">First Name</option>
-            <option value="personal.middleName">Middle Name</option>
-            <option value="personal.lastName">Last Name</option>
-            <option value="personal.preferredName">Preferred Name</option>
-            <option value="contact.email">Email Address</option>
-            <option value="contact.phone">Phone Number</option>
-            <option value="contact.address">Address Line</option>
-            <option value="contact.city">City</option>
-            <option value="contact.state">State / Province</option>
-            <option value="contact.postalCode">Postal Code</option>
-            <option value="contact.country">Country</option>
-            <option value="professional.linkedin">LinkedIn</option>
-            <option value="professional.github">GitHub</option>
-            <option value="professional.portfolio">Portfolio</option>
-            <option value="professional.website">Website</option>
+            <option value="personal.firstName" ${defaultProfilePath === "personal.firstName" ? "selected" : ""}>First Name</option>
+            <option value="personal.middleName" ${defaultProfilePath === "personal.middleName" ? "selected" : ""}>Middle Name</option>
+            <option value="personal.lastName" ${defaultProfilePath === "personal.lastName" ? "selected" : ""}>Last Name</option>
+            <option value="personal.preferredName" ${defaultProfilePath === "personal.preferredName" ? "selected" : ""}>Preferred Name</option>
+            <option value="contact.email" ${defaultProfilePath === "contact.email" ? "selected" : ""}>Email Address</option>
+            <option value="contact.phone" ${defaultProfilePath === "contact.phone" ? "selected" : ""}>Phone Number</option>
+            <option value="contact.address" ${defaultProfilePath === "contact.address" ? "selected" : ""}>Address Line</option>
+            <option value="contact.city" ${defaultProfilePath === "contact.city" ? "selected" : ""}>City</option>
+            <option value="contact.state" ${defaultProfilePath === "contact.state" ? "selected" : ""}>State / Province</option>
+            <option value="contact.postalCode" ${defaultProfilePath === "contact.postalCode" ? "selected" : ""}>Postal Code</option>
+            <option value="contact.country" ${defaultProfilePath === "contact.country" ? "selected" : ""}>Country</option>
+            <option value="professional.linkedin" ${defaultProfilePath === "professional.linkedin" ? "selected" : ""}>LinkedIn</option>
+            <option value="professional.github" ${defaultProfilePath === "professional.github" ? "selected" : ""}>GitHub</option>
+            <option value="professional.portfolio" ${defaultProfilePath === "professional.portfolio" ? "selected" : ""}>Portfolio</option>
+            <option value="professional.website" ${defaultProfilePath === "professional.website" ? "selected" : ""}>Website</option>
           </select>
+
+          <label style="margin-top:8px;">Value to save for this profile field:</label>
+          <input type="text" id="entered-val-input" placeholder="e.g. Jane" value="${currentProfileVal}"/>
         `;
+
+        const pathSelect = dynamicInputs.querySelector<HTMLSelectElement>("#profile-path");
+        const valInput = dynamicInputs.querySelector<HTMLInputElement>("#entered-val-input");
+        if (pathSelect && valInput) {
+          pathSelect.addEventListener("change", () => {
+            const pathVal = getProfileValueByPath(options.profile, pathSelect.value);
+            if (pathVal) {
+              valInput.value = pathVal;
+            }
+          });
+        }
       } else if (type === "customField") {
         const customOptions = options.profile.customFields
           .map((c) => `<option value="${c.id}">${c.name}</option>`)
@@ -444,15 +489,21 @@ export class AssistantOverlay {
           <select id="answer-id">
             ${answerOptions || `<option value="">No application answers created</option>`}
           </select>
+          <label style="margin-top:8px;">Value / Answer:</label>
+          <input type="text" id="entered-val-input" placeholder="e.g. Yes" value="${pageCurrentValue}"/>
         `;
       } else if (type === "fixedValue") {
         dynamicInputs.innerHTML = `
-          <label>Fixed Value</label>
-          <input type="text" id="fixed-val-input" placeholder="e.g. Yes, No, or answer text" value=""/>
+          <label>Fixed Value / Answer:</label>
+          <input type="text" id="fixed-val-input" placeholder="e.g. Yes, No, or standard answer" value="${pageCurrentValue}"/>
         `;
       } else {
         dynamicInputs.innerHTML = `<p style="font-size:12px;color:#94a3b8;margin-top:10px;">This field will be skipped automatically on future scans.</p>`;
       }
+    };
+
+    sourceType.addEventListener("change", () => {
+      renderInputsForType(sourceType.value);
     });
 
     modalBackdrop.querySelector("#modal-cancel")?.addEventListener("click", () => {
@@ -463,19 +514,23 @@ export class AssistantOverlay {
       const type = sourceType.value as any;
       let pathOrValue = "";
       let fixedVal: string | undefined;
+      let enteredVal: string | undefined;
 
       if (type === "profile") {
         pathOrValue = modalBackdrop.querySelector<HTMLSelectElement>("#profile-path")?.value || "";
+        enteredVal = modalBackdrop.querySelector<HTMLInputElement>("#entered-val-input")?.value || "";
       } else if (type === "customField") {
         pathOrValue = modalBackdrop.querySelector<HTMLSelectElement>("#custom-field-id")?.value || "";
       } else if (type === "applicationAnswer") {
         pathOrValue = modalBackdrop.querySelector<HTMLSelectElement>("#answer-id")?.value || "";
+        enteredVal = modalBackdrop.querySelector<HTMLInputElement>("#entered-val-input")?.value || "";
       } else if (type === "fixedValue") {
         fixedVal = modalBackdrop.querySelector<HTMLInputElement>("#fixed-val-input")?.value || "";
         pathOrValue = fixedVal;
+        enteredVal = fixedVal;
       }
 
-      void options.onTeach(field.fieldId, type, pathOrValue, fixedVal).then(() => {
+      void options.onTeach(field.fieldId, type, pathOrValue, fixedVal, enteredVal).then(() => {
         modalBackdrop.remove();
         options.onRefill();
       });
