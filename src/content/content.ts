@@ -23,7 +23,7 @@ const overlay = new AssistantOverlay();
 let lastOutcomes: FieldFillResult[] = [];
 let observer: PageObserver | null = null;
 
-async function runAutofill(showOverlayUI = true): Promise<{ outcomes: FieldFillResult[]; unknown: UnknownFieldInfo[] }> {
+async function runAutofill(showOverlayUI = true, isManual = false): Promise<{ outcomes: FieldFillResult[]; unknown: UnknownFieldInfo[] }> {
   try {
     const detection = detectWorkday(location, document);
     if (!detection.isWorkday) {
@@ -45,10 +45,30 @@ async function runAutofill(showOverlayUI = true): Promise<{ outcomes: FieldFillR
     teachingController.clearQueue();
 
     const outcomes: FieldFillResult[] = [];
+    const shouldWriteToDOM = isManual || settings.autoFillHighConfidence;
 
     for (const field of fields) {
       const candidate = mappingEngine.resolve(field);
-      const result = await executeAutofillField(field, candidate, settings.overwriteExisting);
+      let result: FieldFillResult;
+
+      if (shouldWriteToDOM) {
+        result = await executeAutofillField(field, candidate, settings.overwriteExisting);
+      } else {
+        // Inspection mode: do not write to DOM automatically without user consent
+        const label = field.fingerprint.label || field.fingerprint.accessibleName || "Unnamed field";
+        const hasVal = candidate.value !== undefined && candidate.value !== "";
+        result = {
+          fieldId: field.id,
+          label,
+          kind: field.fingerprint.kind,
+          outcome: hasVal ? "filled" : "unknown",
+          detail: hasVal ? "Ready to fill." : (candidate.reason || "No mapping value available."),
+          valueAttempted: candidate.value,
+          confidence: candidate.confidence,
+          mappingSource: candidate.source
+        };
+      }
+
       outcomes.push(result);
 
       // Register for teaching if unknown, review, confidence 0, or missing value
@@ -77,13 +97,15 @@ async function runAutofill(showOverlayUI = true): Promise<{ outcomes: FieldFillR
           return await learnCurrentPageValues(document, profileStore, mappingStore);
         },
         onSavePageValues: async (entries) => {
-          return await savePageFieldValues(entries, document, profileStore, mappingStore);
+          const count = await savePageFieldValues(entries, document, profileStore, mappingStore);
+          void runAutofill(true, true);
+          return count;
         },
         onForgetPage: async () => {
           return await forgetCurrentPage(document, profileStore, mappingStore);
         },
         onClose: () => overlay.remove(),
-        onRefill: () => void runAutofill(true)
+        onRefill: () => void runAutofill(true, true)
       });
     }
 
@@ -112,18 +134,25 @@ try {
         logger.info("Application page transition detected", { heading: fingerprint.heading });
         const current = detectWorkday(location, document);
         if (current.isApplication) {
-          void runAutofill(false);
+          void runAutofill(false, false);
         }
       },
       onDynamicFields: () => {
         const current = detectWorkday(location, document);
         if (current.isApplication) {
-          void runAutofill(false);
+          void runAutofill(false, false);
         }
       }
     });
 
     observer.start();
+
+    // Initial inspection pass on load
+    if (detection.isApplication) {
+      setTimeout(() => {
+        void runAutofill(true, false);
+      }, 500);
+    }
   }
 } catch (err) {
   logger.warn("Initialization guard notice", { error: String(err) });
@@ -136,7 +165,7 @@ try {
       const currentDetection = detectWorkday(location, document);
 
       if (message.type === messageTypes.runAutofill || message.type === "RUN_AUTOFILL") {
-        void runAutofill(message.showOverlay ?? true).then(({ outcomes, unknown }) => {
+        void runAutofill(message.showOverlay ?? true, true).then(({ outcomes, unknown }) => {
           try {
             sendResponse({
               supported: currentDetection.isWorkday,

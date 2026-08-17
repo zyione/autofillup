@@ -296,6 +296,28 @@ document.querySelector<HTMLInputElement>("#mapping-search")?.addEventListener("i
   });
 });
 
+// Save settings immediately when toggled
+async function autoSaveSettings(): Promise<void> {
+  const settings = {
+    autoFillHighConfidence: (document.querySelector("#set-autoFillHigh") as HTMLInputElement).checked,
+    overwriteExisting: !(document.querySelector("#set-protectExisting") as HTMLInputElement).checked,
+    showFloatingStatus: (document.querySelector("#set-floatingStatus") as HTMLInputElement).checked,
+    confidenceThreshold: Number((document.querySelector("#set-threshold") as HTMLInputElement).value) || 80
+  };
+  await settingsStore.save(settings);
+
+  const statusMsg = document.querySelector<HTMLSpanElement>("#save-status")!;
+  statusMsg.textContent = "✓ Preferences updated";
+  setTimeout(() => {
+    statusMsg.textContent = "";
+  }, 2000);
+}
+
+document.querySelector("#set-autoFillHigh")?.addEventListener("change", () => void autoSaveSettings());
+document.querySelector("#set-protectExisting")?.addEventListener("change", () => void autoSaveSettings());
+document.querySelector("#set-floatingStatus")?.addEventListener("change", () => void autoSaveSettings());
+document.querySelector("#set-threshold")?.addEventListener("change", () => void autoSaveSettings());
+
 // Load profile data into form
 async function loadAllData(): Promise<void> {
   const [profile, mappings, settings] = await Promise.all([
