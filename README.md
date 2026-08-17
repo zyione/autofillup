@@ -1,143 +1,161 @@
 # AutoFillUp – MyWorkday
 
-AutoFillUp – MyWorkday is a privacy-first Chrome extension for assisting with repetitive Workday job-application entry. It is designed to keep the applicant in control: the extension will never submit an application.
+**AutoFillUp – MyWorkday** is a privacy-first, local-only Chrome extension designed to streamline repetitive Workday job application forms. Built with Manifest V3 and TypeScript, it keeps you completely in control: **it operates 100% locally on your machine and will never automatically submit an application.**
 
-> **Current status: first usable Workday prototype.** It provides local profile editing and conservative filling of common text/select fields. Always review every answer; Workday’s UI can differ by tenant and application.
+---
 
-## What is included
+## ✨ Features
 
-- Chrome Extension Manifest V3 configuration.
-- A background service worker with a small typed message contract.
-- A content-script entry point scoped to Apex Group's Workday site.
-- Popup and options page for local identity/contact/link details and reusable answers.
-- Typed wrappers around `chrome.storage.local` for future local-only profile data.
-- Shared logging, utility, profile, session, and ATS-adapter interfaces.
-- Type checking, one unit test, and a Vite production-build workflow.
+- **🔒 100% Privacy & Local Storage**: All profile data, application answers, and custom mappings are saved exclusively in `chrome.storage.local`. No analytics, no cloud sync, zero external telemetry.
+- **🛡️ Conservative & Safe Filling**:
+  - Automatically respects existing input values to prevent accidental overwrites.
+  - Never clicks "Submit", "Next", or signs legal agreements on your behalf.
+  - Flagged review status for low-confidence or ambiguous fields.
+- **📋 Comprehensive Profile Management (Options Page)**:
+  - **Personal & Contact Details**: Names, addresses, email, phone number, and social/portfolio links (LinkedIn, GitHub, Portfolio).
+  - **Education History**: Multiple academic records with degree, institution, field of study, GPA, and dates.
+  - **Employment History**: Chronological job history with titles, employers, locations, bulleted descriptions, and current role toggles.
+  - **Categorized Skills**: Programming languages, frameworks, databases, cloud/devops, tools, and certifications.
+  - **Custom Profile Fields**: Add bespoke keys/values (e.g. Clearance Level, Desired Salary, Notice Period).
+  - **Application Answers**: Predefined responses for screening questions (e.g. Sponsorship, Work Authorization, Relocation, Notice Period).
+  - **Mapping Library**: Inspect, search, edit, or delete custom field mappings learned from past sessions.
+  - **Safety Settings**: Configurable confidence thresholds and overwrite preferences.
+  - **Backup & Restore**: Export your complete profile and learned mappings to a JSON backup file and restore anytime.
+- **🧠 Interactive Teaching UI & In-Page Overlay**:
+  - Floating assistant overlay on Workday pages displaying filled, review, and unknown field counts.
+  - One-click **"Teach Field"** interface allowing you to map unknown or custom Workday inputs directly to your profile attributes or fixed values.
+- **🌐 Broad Workday Tenant Coverage**: Works out-of-the-box on all Workday application domains (`https://*.myworkdayjobs.com/*`).
 
-## Not included yet
+---
 
-The following are deliberately outside this foundation milestone:
+## 🔒 Permissions & Security
 
-- Reliable support for every custom Workday component, including complex comboboxes, radio groups, and checkboxes. These are flagged for review rather than guessed.
-- Full unknown-field teaching UI, repeating employment/education entry creation, and mapping-library management.
-- Other ATS integrations.
-- AI-generated content, resume analysis, or job matching.
-- Automatic application submission.
+| Permission | Reason |
+| :--- | :--- |
+| `storage` | Stores your profile records, preferences, and learned mappings securely in `chrome.storage.local`. |
+| `activeTab` | Allows the toolbar popup to query and communicate with the active Workday application tab. |
 
-## Privacy and permissions
+**Host Scope:** Content scripts run exclusively on `https://*.myworkdayjobs.com/*`. The extension cannot read or access pages outside Workday job boards.
 
-The extension requests only one Chrome permission:
+---
 
-| Permission | Why it is needed |
-| --- | --- |
-| `storage` | To support future local-only profile and preference storage. |
+## 🛠️ Prerequisites
 
-The content script runs only on `https://theapexgroup.wd3.myworkdayjobs.com/*`. It does not request broad access to all websites, network access, clipboard access, or browsing history.
+- **Google Chrome** (or any Chromium-based browser such as Brave, Edge, Arc).
+- **Node.js**: v20 or v22+ LTS recommended.
+- **Package Manager**: `npm` (or `pnpm`).
 
-No user data is collected or transmitted by this milestone. When profile storage is added, it will use `chrome.storage.local`, which remains in the user’s local Chrome profile unless the user separately enables Chrome’s own browser sync behavior.
+---
 
-## Prerequisites
+## 🚀 Setup & Installation
 
-- Google Chrome or another Chromium browser with extension developer mode.
-- Node.js 20 or later (Node 22 LTS is recommended).
-- npm, pnpm, or another Node package manager.
+### 1. Clone the repository and install dependencies
 
-## Install dependencies
-
-From the project directory:
-
-```sh
+```bash
+# Using npm
 npm install
-```
 
-The repository includes a `pnpm-lock.yaml`; if you use pnpm instead, run:
-
-```sh
+# Or using pnpm
 pnpm install
 ```
 
-## Verify the project
+### 2. Build the extension
 
-Run all local checks before packaging:
-
-```sh
-npm run typecheck
-npm test
+```bash
+# Production build
 npm run build
+
+# Or development watch mode (auto-rebuilds on file change)
+npm run dev
 ```
 
-| Command | Purpose |
-| --- | --- |
-| `npm run typecheck` | Validates TypeScript without generating output. |
-| `npm test` | Runs the unit test suite with Vitest. |
-| `npm run build` | Creates an unpacked Chrome extension in `dist/`. |
-| `npm run dev` | Rebuilds `dist/` whenever source files change. |
+The compiled Chrome extension will be output to the `dist/` directory.
 
-## Load the extension in Chrome
+### 3. Verify types and tests (Optional)
 
-1. Run `npm run build`.
-2. Open `chrome://extensions` in Chrome.
-3. Enable **Developer mode** using the toggle in the top-right corner.
-4. Select **Load unpacked**.
-5. Choose this project’s `dist` folder.
-6. Optionally pin **AutoFillUp – MyWorkday** from Chrome’s Extensions menu.
+```bash
+# Run TypeScript typecheck
+npm run typecheck
 
-After it loads, Chrome should display the extension without manifest errors.
+# Run Vitest unit tests
+npm test
+```
 
-## Manual smoke test
+---
 
-This prototype uses conservative built-in mappings for common identity, contact, and professional-link fields. It does not overwrite an existing value unless you enable that option in settings.
+## 🧩 Loading into Chrome
 
-1. Open the extension’s **Details** page in `chrome://extensions` and select **Extension options**. Add a test first name, last name, email, and phone number, then save.
-2. Visit an Apex Group Workday application page and click the pinned extension icon.
-3. Select **Fill this page** and confirm its summary and the in-page review panel appear.
-4. Verify that only appropriate empty text/select fields were changed, then undo or correct any value before continuing.
-3. Visit `https://theapexgroup.wd3.myworkdayjobs.com/`.
-4. Open the page’s Developer Tools console. A debug message beginning with `[AutoFillUp] Content-script foundation loaded` confirms the scoped content script was loaded.
-5. Confirm that the extension does not press Next, Submit, or accept terms/consents for you.
+1. Open Google Chrome and navigate to `chrome://extensions`.
+2. Turn **ON** the **Developer mode** toggle in the top-right corner.
+3. Click the **Load unpacked** button in the top-left toolbar.
+4. Select the **`dist`** directory inside this project folder (`.../autofillup/dist`).
+5. (Recommended) Click the Chrome **Extensions puzzle icon** in your browser toolbar and **Pin** `AutoFillUp – MyWorkday` for quick access.
 
-### If Chrome reports an error
+---
 
-- Run `npm run build` again and reload the extension from its Details page.
-- Ensure you selected `dist/`, not the project root.
-- Check the **Errors** button on the extension card for the exact Chrome message.
-- Confirm the content-script test is on the exact Apex Group host; the extension is not yet enabled on other Workday tenants.
+## 📖 How to Use
 
-## Project layout
+### Step 1: Configure Your Profile
+1. Right-click the **AutoFillUp** toolbar icon and choose **Options** (or click the gear icon in the popup).
+2. Fill in your details across the tabs:
+   - **Personal & Contact**: First/last name, phone, address, LinkedIn, GitHub, etc.
+   - **Education & Employment**: Add your degrees and past work experiences.
+   - **Skills & Answers**: Add screening answers (e.g., citizenship status, visa sponsorship requirements).
+   - **Safety & Settings**: Adjust autofill confidence thresholds and overlay display.
+3. Click **Save All Changes** at the top right.
+
+> 💡 **Tip:** You can download a backup of your profile anytime under the **Backup & Restore** tab.
+
+### Step 2: Navigate to a Workday Application
+1. Go to any job application page hosted on `*.myworkdayjobs.com`.
+2. The extension automatically detects the Workday portal and tenant name.
+
+### Step 3: Autofill and Review
+1. Click the **AutoFillUp extension icon** in your toolbar.
+2. Click **Autofill Page** (or let the floating assistant overlay assist you).
+3. The extension scans inputs and fills corresponding fields matching your profile data.
+4. Review all filled inputs:
+   - **Filled**: Form controls populated with high confidence.
+   - **Review / Unknown**: Any inputs flagged for manual confirmation.
+5. If an unmapped field appears, click **Teach Field** in the overlay to associate it with a profile attribute or standard answer for future applications.
+6. Verify and manually proceed with the application steps.
+
+---
+
+## 📁 Project Structure
 
 ```text
-autofillup-myworkday/
-├── public/manifest.json       # MV3 manifest copied into dist during build
+autofillup/
+├── public/
+│   └── manifest.json            # Manifest V3 extension configuration
 ├── src/
-│   ├── adapters/              # Generic ATS contract; no implementation yet
-│   ├── background/            # Service worker and message handling
-│   ├── content/               # Passive content-script entry point
-│   ├── options/               # Options-page shell
-│   ├── popup/                 # Toolbar popup shell
-│   ├── shared/                # Types, messages, logger, utilities
-│   └── storage/               # Typed chrome.storage.local abstraction
-├── tests/unit/                # Unit tests
-├── vite.config.ts             # Multi-entry extension build setup
-└── dist/                      # Generated unpacked extension; not committed
+│   ├── adapters/                # ATS adapter contracts
+│   ├── background/              # MV3 background service worker
+│   ├── content/                 # Workday content scripts
+│   │   ├── autofill/            # DOM filling mechanisms (inputs, selects, custom dropdowns)
+│   │   ├── detection/           # Workday tenant & page fingerprint detection
+│   │   ├── fields/              # Field scanning and normalization
+│   │   ├── learning/            # Teaching controller for unknown fields
+│   │   ├── mapping/             # Semantic heuristic & candidate mapping engine
+│   │   ├── observation/         # Mutation observer for dynamic page changes
+│   │   └── ui/                  # Floating assistant overlay & review panel
+│   ├── options/                 # Options dashboard (HTML/CSS/TS)
+│   ├── popup/                   # Browser action popup (HTML/CSS/TS)
+│   ├── shared/                  # Shared types, logging, and message interfaces
+│   └── storage/                 # Typed chrome.storage.local abstraction layer
+├── tests/                       # Vitest unit tests & DOM fixtures
+├── package.json
+├── tsconfig.json
+└── vite.config.ts               # Multi-entry Vite bundler configuration
 ```
 
-## Development notes
+---
 
-The background service worker coordinates extension lifecycle and message passing. It never manipulates a webpage DOM. Future DOM interaction belongs in the content script, which is the only extension component with direct access to the Workday page.
+## 📜 Development Scripts
 
-The `AtsAdapter` interface exists so Workday-specific behavior can later be isolated from generic profile, mapping, and filling logic. There is no Workday adapter implementation in this milestone.
-
-## Planned next steps
-
-The next implementation milestone should introduce the local profile schema and profile-management UI. Following milestones can then add conservative Workday detection, field detection, mapping, page observation, and user-reviewed autofill behavior.
-
-Every future autofill feature must preserve these safety rules:
-
-- Prefer leaving an uncertain field empty instead of guessing.
-- Do not overwrite existing user-entered values by default.
-- Clearly surface skipped, unknown, and review-required fields.
-- Never automatically submit a job application.
-
-## License
-
-No license has been selected yet. Add a license before publishing or distributing the extension more broadly.
+| Command | Description |
+| :--- | :--- |
+| `npm run build` | Builds production-ready unpacked extension in `dist/` |
+| `npm run dev` | Watches source files and continuously rebuilds `dist/` |
+| `npm run typecheck` | Validates TypeScript types across the project |
+| `npm test` | Runs the test suite using Vitest |
