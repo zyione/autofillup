@@ -20,6 +20,29 @@ async function queryActiveTab(): Promise<chrome.tabs.Tab | undefined> {
   return tab;
 }
 
+async function ensureContentScript(tabId: number): Promise<boolean> {
+  try {
+    const res = (await chrome.tabs.sendMessage(tabId, { type: "GET_STATUS" })) as StatusResponse | undefined;
+    if (res !== undefined) return true;
+  } catch {
+    // Content script not yet attached; inject dynamically
+    try {
+      if (chrome.scripting) {
+        await chrome.scripting.executeScript({
+          target: { tabId },
+          files: ["assets/content.js"]
+        });
+        await new Promise((resolve) => setTimeout(resolve, 150));
+        return true;
+      }
+    } catch (err) {
+      console.warn("[AutoFillUp] Programmatic script injection failed:", err);
+      return false;
+    }
+  }
+  return false;
+}
+
 async function initPopup(): Promise<void> {
   const tab = await queryActiveTab();
   if (!tab || !tab.id || !tab.url) {
@@ -27,14 +50,32 @@ async function initPopup(): Promise<void> {
     return;
   }
 
+  const isWorkdayHost =
+    tab.url.includes("myworkdayjobs.com") ||
+    tab.url.includes("workday") ||
+    tab.url.includes("myworkday") ||
+    tab.url.includes("myworkdaysite.com");
+
   try {
-    const response = (await chrome.tabs.sendMessage(tab.id, { type: "GET_STATUS" })) as StatusResponse | undefined;
+    let response = (await chrome.tabs.sendMessage(tab.id, { type: "GET_STATUS" })) as StatusResponse | undefined;
+
+    if (!response && isWorkdayHost) {
+      await ensureContentScript(tab.id);
+      response = (await chrome.tabs.sendMessage(tab.id, { type: "GET_STATUS" })) as StatusResponse | undefined;
+    }
 
     if (!response || !response.supported) {
-      siteBadge.textContent = "Not Workday";
-      siteBadge.className = "site-badge inactive";
-      statusMsg.textContent = "Open a supported Workday application page to activate autofill.";
-      autofillBtn.disabled = true;
+      if (isWorkdayHost) {
+        siteBadge.textContent = "Workday Detected";
+        siteBadge.className = "site-badge active";
+        statusMsg.textContent = "Please refresh this Workday tab (press F5 / Ctrl+R) to activate the assistant.";
+        autofillBtn.disabled = false;
+      } else {
+        siteBadge.textContent = "Not Workday";
+        siteBadge.className = "site-badge inactive";
+        statusMsg.textContent = "Open a supported Workday application page to activate autofill.";
+        autofillBtn.disabled = true;
+      }
       return;
     }
 
@@ -52,12 +93,34 @@ async function initPopup(): Promise<void> {
       statusMsg.textContent = "Click 'Autofill Page' to scan and fill detected fields.";
     }
   } catch {
-    // Content script not loaded yet or not a matching page
-    const isWorkdayHost = tab.url.includes("myworkdayjobs.com") || tab.url.includes("workday");
     if (isWorkdayHost) {
+      // Try injection once
+      const injected = await ensureContentScript(tab.id);
+      if (injected) {
+        try {
+          const retryRes = (await chrome.tabs.sendMessage(tab.id, { type: "GET_STATUS" })) as StatusResponse | undefined;
+          if (retryRes && retryRes.supported) {
+            siteBadge.textContent = "Workday Ready";
+            siteBadge.className = "site-badge active";
+            autofillBtn.disabled = false;
+            pageInfo.style.display = "block";
+            tenantName.textContent = `Tenant: ${retryRes.tenant || "Workday"}`;
+            pageName.textContent = retryRes.currentPage || "Application Form";
+            if (retryRes.outcomes && retryRes.outcomes.length > 0) {
+              updateMetrics(retryRes);
+            } else {
+              statusMsg.textContent = "Click 'Autofill Page' to scan and fill detected fields.";
+            }
+            return;
+          }
+        } catch {
+          // fallback to refresh message
+        }
+      }
+
       siteBadge.textContent = "Workday Detected";
       siteBadge.className = "site-badge active";
-      statusMsg.textContent = "Refresh page or click 'Autofill Page' to activate.";
+      statusMsg.textContent = "Please refresh this Workday tab (press F5 or Ctrl+R) to connect the assistant.";
       autofillBtn.disabled = false;
     } else {
       siteBadge.textContent = "Not Workday";
@@ -98,16 +161,31 @@ autofillBtn.addEventListener("click", async () => {
   statusMsg.textContent = "Scanning and autofilling...";
 
   try {
-    const response = (await chrome.tabs.sendMessage(tab.id, {
-      type: "RUN_AUTOFILL",
-      showOverlay: true
-    })) as StatusResponse | undefined;
+    let response: StatusResponse | undefined;
+    try {
+      response = (await chrome.tabs.sendMessage(tab.id, {
+        type: "RUN_AUTOFILL",
+        showOverlay: true
+      })) as StatusResponse | undefined;
+    } catch {
+      // Content script may not be loaded; attempt injection then retry
+      await ensureContentScript(tab.id);
+      response = (await chrome.tabs.sendMessage(tab.id, {
+        type: "RUN_AUTOFILL",
+        showOverlay: true
+      })) as StatusResponse | undefined;
+    }
 
     if (response) {
+      siteBadge.textContent = "Workday Ready";
+      siteBadge.className = "site-badge active";
+      pageInfo.style.display = "block";
+      tenantName.textContent = `Tenant: ${response.tenant || "Workday"}`;
+      pageName.textContent = response.currentPage || "Application Form";
       updateMetrics(response);
     }
   } catch (err) {
-    statusMsg.textContent = "Error communicating with page. Please refresh.";
+    statusMsg.textContent = "Could not connect to page. Please reload the Workday tab (F5) and try again.";
   } finally {
     autofillBtn.disabled = false;
   }
@@ -117,8 +195,12 @@ reviewBtn.addEventListener("click", async () => {
   const tab = await queryActiveTab();
   if (!tab || !tab.id) return;
 
-  // Trigger autofill with overlay so user can teach on page
-  await chrome.tabs.sendMessage(tab.id, { type: "RUN_AUTOFILL", showOverlay: true });
+  try {
+    await chrome.tabs.sendMessage(tab.id, { type: "RUN_AUTOFILL", showOverlay: true });
+  } catch {
+    await ensureContentScript(tab.id);
+    await chrome.tabs.sendMessage(tab.id, { type: "RUN_AUTOFILL", showOverlay: true });
+  }
   window.close();
 });
 

@@ -5,7 +5,9 @@
   "description": "Privacy-first Workday application assistant Chrome extension.",
   "type": "module",
   "scripts": {
-    "build": "vite build",
+    "build:ui": "vite build",
+    "build:content": "vite build --config vite.content.config.ts",
+    "build": "vite build && vite build --config vite.content.config.ts",
     "dev": "vite build --watch",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"

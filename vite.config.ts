@@ -6,7 +6,6 @@ const projectRoot = fileURLToPath(new URL(".", import.meta.url));
 
 const entryName = (id: string): string => {
   if (id.endsWith("service-worker.ts")) return "service-worker";
-  if (id.endsWith("content.ts")) return "content";
   return "[name]";
 };
 
@@ -18,8 +17,7 @@ export default defineConfig({
       input: {
         popup: resolve(projectRoot, "src/popup/popup.html"),
         options: resolve(projectRoot, "src/options/options.html"),
-        "service-worker": resolve(projectRoot, "src/background/service-worker.ts"),
-        content: resolve(projectRoot, "src/content/content.ts")
+        "service-worker": resolve(projectRoot, "src/background/service-worker.ts")
       },
       output: {
         entryFileNames: (chunk) => `assets/${entryName(chunk.facadeModuleId ?? "")}.js`,
