@@ -34,7 +34,7 @@ navItems.forEach((btn) => {
     btn.classList.add("active");
     const targetPane = document.getElementById(`tab-${tabName}`);
     if (targetPane) targetPane.classList.add("active");
-    pageTitle.textContent = btn.textContent;
+    pageTitle.textContent = btn.textContent?.replace(/\s*\(\d+\)/, "") || "";
   });
 });
 
@@ -200,7 +200,7 @@ function renderMappingItem(m: FieldMapping): HTMLElement {
   card.className = "record-card";
   card.dataset.id = m.id;
   const targetLabel = m.fingerprint.label || m.fingerprint.accessibleName || "Unnamed Field";
-  const sourceText = m.source === "fixedValue" ? `Fixed: "${m.fixedValue}"` : `${m.source}: ${m.sourcePath || ""}`;
+  const sourceText = m.source === "fixedValue" ? `Fixed Value: "${m.fixedValue}"` : `${m.source}: ${m.sourcePath || ""}`;
 
   card.innerHTML = `
     <div class="record-header">
@@ -216,7 +216,7 @@ function renderMappingItem(m: FieldMapping): HTMLElement {
       </div>
     </div>
     <div style="font-size:12px;color:#cbd5e1;margin-top:6px;">
-      <strong>Maps to:</strong> ${sourceText} &nbsp;|&nbsp; <strong>Scope:</strong> ${m.tenantScope === "*" ? "All Tenants" : m.tenantScope}
+      <strong>Fills with:</strong> <span style="color:#38bdf8;font-weight:600;">${sourceText}</span> &nbsp;|&nbsp; <strong>Scope:</strong> ${m.tenantScope === "*" ? "All Workday Sites" : m.tenantScope}
     </div>
   `;
 
@@ -307,6 +307,20 @@ async function loadAllData(): Promise<void> {
   currentProfile = profile;
   currentMappings = mappings;
 
+  // Update Nav Counts
+  const answersNav = document.querySelector<HTMLButtonElement>('[data-tab="answers"]');
+  if (answersNav) {
+    answersNav.textContent = `Application Answers (${profile.applicationAnswers.length})`;
+  }
+  const mappingsNav = document.querySelector<HTMLButtonElement>('[data-tab="mappings"]');
+  if (mappingsNav) {
+    mappingsNav.textContent = `Mapping Library (${mappings.length})`;
+  }
+  const customNav = document.querySelector<HTMLButtonElement>('[data-tab="custom-fields"]');
+  if (customNav) {
+    customNav.textContent = `Custom Fields (${profile.customFields.length})`;
+  }
+
   // Personal
   (document.querySelector("#p-firstName") as HTMLInputElement).value = profile.personal.firstName;
   (document.querySelector("#p-middleName") as HTMLInputElement).value = profile.personal.middleName;
@@ -356,7 +370,7 @@ async function loadAllData(): Promise<void> {
   // Mappings
   mappingsList.innerHTML = "";
   if (mappings.length === 0) {
-    mappingsList.innerHTML = `<p style="color:#94a3b8;font-size:13px;">No learned mappings saved yet. They will appear here when you teach fields on job applications.</p>`;
+    mappingsList.innerHTML = `<p style="color:#94a3b8;font-size:13px;">No learned mappings saved yet. They will appear here automatically when you teach fields on job applications or use the Page Inspector.</p>`;
   } else {
     mappings.forEach((m) => mappingsList.append(renderMappingItem(m)));
   }
@@ -467,6 +481,11 @@ document.querySelector("#save-all-btn")?.addEventListener("click", () => {
   void saveAll();
 });
 
+// Auto-reload data whenever the Options window gains focus
+window.addEventListener("focus", () => {
+  void loadAllData();
+});
+
 // Export JSON Backup
 document.querySelector("#export-json-btn")?.addEventListener("click", async () => {
   const [profile, mappings, settings] = await Promise.all([
@@ -489,6 +508,7 @@ document.querySelector("#export-json-btn")?.addEventListener("click", async () =
   a.href = url;
   a.download = `autofillup-backup-${new Date().toISOString().slice(0, 10)}.json`;
   a.click();
+  a.remove();
   URL.revokeObjectURL(url);
 });
 
