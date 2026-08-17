@@ -1,7 +1,12 @@
 import "./options.css";
-
-const status = document.querySelector<HTMLParagraphElement>("#storage-status");
-
-void chrome.storage.local.getBytesInUse().then((bytes) => {
-  if (status) status.textContent = `Local extension storage ready (${bytes} bytes currently used).`;
-});
+import { ProfileStore } from "../storage/profile-store";
+import { SettingsStore } from "../storage/settings-store";
+import type { ApplicationAnswer, UserProfile } from "../shared/types";
+const profileStore = new ProfileStore(); const settingsStore = new SettingsStore(); const form = document.querySelector<HTMLFormElement>("#profile-form")!; const answers = document.querySelector<HTMLDivElement>("#answers")!; const status = document.querySelector<HTMLSpanElement>("#status")!;
+let profile: UserProfile;
+function setPath(target: UserProfile, path: string, value: string): void { const [group, property] = path.split("."); (target[group as keyof UserProfile] as Record<string, string>)[property] = value; }
+function answerRow(answer: ApplicationAnswer = { id: crypto.randomUUID(), name: "", value: "", description: "" }): HTMLElement { const row = document.createElement("div"); row.className = "answer"; row.innerHTML = `<input aria-label="Answer name" placeholder="Question name" value="${answer.name.replaceAll('"', "&quot;")}"/><input aria-label="Answer value" placeholder="Answer" value="${answer.value.replaceAll('"', "&quot;")}"/><button type="button">Remove</button>`; row.querySelector("button")!.addEventListener("click", () => row.remove()); return row; }
+async function load(): Promise<void> { profile = await profileStore.get(); for (const input of form.querySelectorAll<HTMLInputElement>("input[name]")) input.value = String(input.name.split(".").reduce<unknown>((value, part) => (value as Record<string, unknown>)[part], profile) ?? ""); profile.applicationAnswers.forEach((answer) => answers.append(answerRow(answer))); const settings = await settingsStore.get(); document.querySelector<HTMLInputElement>("#overwrite")!.checked = settings.overwriteExisting; }
+document.querySelector("#add-answer")!.addEventListener("click", () => answers.append(answerRow()));
+form.addEventListener("submit", (event) => { event.preventDefault(); for (const input of form.querySelectorAll<HTMLInputElement>("input[name]")) setPath(profile, input.name, input.value.trim()); profile.applicationAnswers = [...answers.querySelectorAll<HTMLDivElement>(".answer")].map((row) => ({ id: crypto.randomUUID(), name: row.querySelectorAll<HTMLInputElement>("input")[0].value.trim(), value: row.querySelectorAll<HTMLInputElement>("input")[1].value.trim(), description: "" })).filter((item) => item.name && item.value); void Promise.all([profileStore.save(profile), settingsStore.save({ autoFillHighConfidence: true, overwriteExisting: document.querySelector<HTMLInputElement>("#overwrite")!.checked })]).then(() => { status.textContent = "Saved locally."; }); });
+void load();

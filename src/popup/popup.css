@@ -4,3 +4,4 @@ main { padding: 16px; }
 h1 { font-size: 18px; margin: 0 0 8px; }
 p { line-height: 1.4; }
 a { color: #2457b5; }
+button { border:0; border-radius:6px; padding:8px 10px; background:#2457b5; color:white; font:inherit; cursor:pointer; } #summary { color:#43516b; font-size:12px; }
