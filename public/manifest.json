@@ -1,0 +1,26 @@
+{
+  "manifest_version": 3,
+  "name": "AutoFillUp – MyWorkday",
+  "version": "0.1.0",
+  "description": "A privacy-first Workday application assistant. It never submits applications.",
+  "permissions": ["storage"],
+  "background": {
+    "service_worker": "assets/service-worker.js",
+    "type": "module"
+  },
+  "action": {
+    "default_title": "AutoFillUp – MyWorkday",
+    "default_popup": "src/popup/popup.html"
+  },
+  "options_ui": {
+    "page": "src/options/options.html",
+    "open_in_tab": true
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://theapexgroup.wd3.myworkdayjobs.com/*"],
+      "js": ["assets/content.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}
