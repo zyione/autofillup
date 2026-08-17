@@ -10,6 +10,12 @@ export interface LearnResult {
   mappingsCreated: string[];
 }
 
+export interface FieldSaveEntry {
+  fieldId: string;
+  label: string;
+  value: string;
+}
+
 export function extractCurrentFieldValue(field: FieldDescriptor): string | undefined {
   const el = field.element;
   if (!el) return undefined;
@@ -159,6 +165,87 @@ export async function learnCurrentPageValues(
     profileFieldsUpdated: profileUpdated,
     mappingsCreated
   };
+}
+
+export async function savePageFieldValues(
+  entries: FieldSaveEntry[],
+  doc: Document = document,
+  profileStore: ProfileStore = new ProfileStore(),
+  mappingStore: MappingStore = new MappingStore()
+): Promise<number> {
+  const profile = await profileStore.get();
+  const existingMappings = await mappingStore.list();
+  let updatedCount = 0;
+  const now = new Date().toISOString();
+
+  for (const entry of entries) {
+    const val = entry.value.trim();
+    if (!val) continue;
+
+    const label = entry.label.trim();
+    const norm = normalizeLabel(label);
+
+    // 1. Check if matches standard profile field
+    let matchedProfile = false;
+    for (const rule of standardProfileMatchRules) {
+      if (rule.pattern.test(norm) || rule.pattern.test(label)) {
+        (profile[rule.section] as any)[rule.field] = val;
+        matchedProfile = true;
+        updatedCount++;
+        break;
+      }
+    }
+
+    if (matchedProfile) continue;
+
+    // 2. Custom field or screening question
+    const existing = existingMappings.find(
+      (m) => m.fingerprint.label.toLowerCase() === norm.toLowerCase()
+    );
+
+    if (!existing) {
+      const newMapping: FieldMapping = {
+        id: typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `mapping-${Date.now()}-${Math.random()}`,
+        fingerprint: {
+          label: label || norm,
+          accessibleName: "",
+          placeholder: "",
+          kind: "unknown",
+          section: "",
+          tenant: location.hostname
+        },
+        source: "fixedValue",
+        fixedValue: val,
+        tenantScope: "*",
+        enabled: true,
+        createdAt: now,
+        updatedAt: now
+      };
+      await mappingStore.save(newMapping);
+    } else {
+      existing.fixedValue = val;
+      existing.updatedAt = now;
+      await mappingStore.save(existing);
+    }
+
+    const ansIdx = profile.applicationAnswers.findIndex(
+      (a) => a.name.toLowerCase() === (label || norm).toLowerCase()
+    );
+    if (ansIdx >= 0) {
+      profile.applicationAnswers[ansIdx].value = val;
+    } else {
+      profile.applicationAnswers.push({
+        id: typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `ans-${Date.now()}`,
+        name: label,
+        value: val,
+        description: "Saved from page editor"
+      });
+    }
+    updatedCount++;
+  }
+
+  await profileStore.save(profile);
+  return updatedCount;
 }
 
 export async function forgetCurrentPage(

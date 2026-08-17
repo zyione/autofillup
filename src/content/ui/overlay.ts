@@ -1,5 +1,5 @@
 import type { FieldFillResult, UnknownFieldInfo, UserProfile } from "../../shared/types";
-import type { LearnResult } from "../learning/page-learner";
+import type { LearnResult, FieldSaveEntry } from "../learning/page-learner";
 import { getProfileValueByPath } from "../mapping/mapping-engine";
 
 export interface OverlayOptions {
@@ -8,6 +8,7 @@ export interface OverlayOptions {
   profile: UserProfile;
   onTeach: (fieldId: string, source: any, valueOrPath: string, fixedValue?: string, enteredValue?: string) => Promise<void>;
   onLearnPage: () => Promise<LearnResult>;
+  onSavePageValues: (entries: FieldSaveEntry[]) => Promise<number>;
   onForgetPage: () => Promise<{ removedCount: number }>;
   onClose: () => void;
   onRefill: () => void;
@@ -30,23 +31,20 @@ export class AssistantOverlay {
       return acc;
     }, {});
 
-    const filledItems = options.outcomes.filter((o) => o.outcome === "filled" || (o.outcome === "skipped" && o.valueAttempted));
-    const remainingUnknown = options.unknownFields;
-
     const style = document.createElement("style");
     style.textContent = `
       .card {
         background: #0f172a;
         color: #f8fafc;
-        border-radius: 12px;
-        box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.5);
+        border-radius: 14px;
+        box-shadow: 0 20px 35px -5px rgba(0, 0, 0, 0.6), 0 10px 15px -6px rgba(0, 0, 0, 0.5);
         border: 1px solid #334155;
-        width: 360px;
+        width: 390px;
         overflow: hidden;
-        animation: slideIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+        animation: slideIn 0.22s cubic-bezier(0.16, 1, 0.3, 1);
       }
       @keyframes slideIn {
-        from { opacity: 0; transform: translateY(12px) scale(0.98); }
+        from { opacity: 0; transform: translateY(14px) scale(0.97); }
         to { opacity: 1; transform: translateY(0) scale(1); }
       }
       .header {
@@ -57,10 +55,10 @@ export class AssistantOverlay {
         justify-content: space-between;
         border-bottom: 1px solid #334155;
       }
-      .header h3 {
+      .header-title {
         margin: 0;
         font-size: 13px;
-        font-weight: 600;
+        font-weight: 700;
         color: #38bdf8;
         display: flex;
         align-items: center;
@@ -71,7 +69,7 @@ export class AssistantOverlay {
         border: none;
         color: #94a3b8;
         cursor: pointer;
-        font-size: 16px;
+        font-size: 17px;
         line-height: 1;
         padding: 4px;
         border-radius: 4px;
@@ -81,7 +79,7 @@ export class AssistantOverlay {
         background: #334155;
       }
       .body {
-        padding: 14px 16px;
+        padding: 12px 14px;
         max-height: 480px;
         overflow-y: auto;
       }
@@ -89,7 +87,7 @@ export class AssistantOverlay {
         display: flex;
         gap: 6px;
         flex-wrap: wrap;
-        margin-bottom: 12px;
+        margin-bottom: 10px;
       }
       .badge {
         font-size: 11px;
@@ -102,116 +100,161 @@ export class AssistantOverlay {
       .badge-unknown { background: #4c1d95; color: #c084fc; }
       .badge-skipped { background: #334155; color: #94a3b8; }
       
-      .learn-banner {
-        background: #064e3b;
-        border: 1px solid #059669;
-        border-radius: 8px;
-        padding: 10px 12px;
-        margin-bottom: 12px;
+      .action-banner {
         display: flex;
-        flex-direction: column;
         gap: 6px;
+        margin-bottom: 10px;
       }
-      .learn-banner span {
-        font-size: 11px;
-        color: #a7f3d0;
-      }
-      .learn-btn {
-        background: #10b981;
-        color: #064e3b;
-        border: none;
+      .btn-quick-learn {
+        flex: 1;
+        background: #065f46;
+        color: #34d399;
+        border: 1px solid #059669;
         border-radius: 6px;
-        padding: 7px 10px;
-        font-size: 12px;
-        font-weight: 700;
+        padding: 6px 8px;
+        font-size: 11px;
+        font-weight: 600;
         cursor: pointer;
         display: flex;
         align-items: center;
         justify-content: center;
-        gap: 6px;
+        gap: 4px;
       }
-      .learn-btn:hover {
-        background: #34d399;
+      .btn-quick-learn:hover {
+        background: #047857;
+        color: #fff;
+      }
+      .btn-save-all {
+        flex: 1;
+        background: #0284c7;
+        color: #fff;
+        border: none;
+        border-radius: 6px;
+        padding: 6px 8px;
+        font-size: 11px;
+        font-weight: 600;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 4px;
+      }
+      .btn-save-all:hover {
+        background: #0369a1;
       }
 
-      .section-box {
-        margin-top: 10px;
-        border-top: 1px solid #334155;
-        padding-top: 10px;
+      .fields-table-container {
+        border: 1px solid #334155;
+        border-radius: 8px;
+        background: #131d31;
+        overflow: hidden;
       }
-      .section-header {
-        font-size: 11px;
-        color: #94a3b8;
-        margin-bottom: 6px;
+      .fields-table-header {
+        padding: 6px 10px;
+        background: #1e293b;
         display: flex;
         justify-content: space-between;
         align-items: center;
+        font-size: 11px;
         font-weight: 600;
+        color: #94a3b8;
+        border-bottom: 1px solid #334155;
       }
-      .toggle-link {
-        color: #38bdf8;
-        font-size: 10px;
-        cursor: pointer;
-        background: none;
-        border: none;
-        padding: 0;
-      }
-      .toggle-link:hover {
-        text-decoration: underline;
-      }
-      .field-list {
+      .fields-list {
+        max-height: 250px;
+        overflow-y: auto;
         display: flex;
         flex-direction: column;
-        gap: 5px;
-        max-height: 160px;
-        overflow-y: auto;
       }
-      .field-row {
-        background: #1e293b;
-        border: 1px solid #334155;
-        border-radius: 6px;
-        padding: 6px 10px;
+      .field-item {
+        padding: 8px 10px;
+        border-bottom: 1px solid #1e293b;
         display: flex;
-        align-items: center;
+        flex-direction: column;
+        gap: 4px;
+      }
+      .field-item:last-child {
+        border-bottom: none;
+      }
+      .field-item:hover {
+        background: rgba(255, 255, 255, 0.02);
+      }
+      .field-top-row {
+        display: flex;
         justify-content: space-between;
+        align-items: center;
         font-size: 11px;
-        gap: 8px;
       }
       .field-label {
-        max-width: 170px;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-        color: #f1f5f9;
-        font-weight: 500;
-      }
-      .field-value {
-        max-width: 130px;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-        color: #38bdf8;
         font-weight: 600;
-        background: #0f172a;
-        padding: 2px 6px;
-        border-radius: 4px;
-        border: 1px solid #1e293b;
+        color: #f1f5f9;
+        max-width: 220px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
       }
-      .teach-btn {
-        background: #0284c7;
-        color: white;
+      .field-kind-badge {
+        font-size: 9px;
+        text-transform: uppercase;
+        color: #64748b;
+        background: #0f172a;
+        padding: 1px 5px;
+        border-radius: 4px;
+      }
+      .field-input-row {
+        display: flex;
+        gap: 6px;
+        align-items: center;
+      }
+      .field-input {
+        flex: 1;
+        background: #0f172a;
+        border: 1px solid #334155;
+        border-radius: 5px;
+        padding: 5px 8px;
+        color: #38bdf8;
+        font-size: 12px;
+        outline: none;
+        box-sizing: border-box;
+      }
+      .field-input:focus {
+        border-color: #0284c7;
+        background: #172554;
+      }
+      .field-input::placeholder {
+        color: #64748b;
+        font-style: italic;
+      }
+      .btn-row-save {
+        background: #334155;
+        color: #f8fafc;
         border: none;
         border-radius: 4px;
-        padding: 4px 8px;
+        padding: 5px 7px;
         font-size: 11px;
         cursor: pointer;
         font-weight: 600;
-        white-space: nowrap;
       }
-      .teach-btn:hover { background: #0369a1; }
-      
+      .btn-row-save:hover {
+        background: #0284c7;
+      }
+      .btn-row-teach {
+        background: #4c1d95;
+        color: #c084fc;
+        border: none;
+        border-radius: 4px;
+        padding: 5px 7px;
+        font-size: 11px;
+        cursor: pointer;
+        font-weight: 600;
+      }
+      .btn-row-teach:hover {
+        background: #6b21a8;
+        color: #fff;
+      }
+
       .toast {
-        background: #064e3b;
+        background: #065f46;
         color: #34d399;
         padding: 8px 10px;
         border-radius: 6px;
@@ -222,31 +265,14 @@ export class AssistantOverlay {
         line-height: 1.4;
       }
 
-      .all-good-box {
-        background: #064e3b;
-        border: 1px solid #059669;
-        border-radius: 6px;
-        padding: 8px 10px;
-        font-size: 12px;
-        color: #34d399;
-        text-align: center;
-        margin-top: 10px;
-        font-weight: 600;
-      }
-
       .footer {
-        padding: 10px 16px;
+        padding: 10px 14px;
         background: #1e293b;
         display: flex;
         justify-content: space-between;
         align-items: center;
         border-top: 1px solid #334155;
         font-size: 11px;
-        gap: 6px;
-      }
-      .footer-actions {
-        display: flex;
-        gap: 6px;
       }
       .refill-btn {
         background: #334155;
@@ -324,7 +350,7 @@ export class AssistantOverlay {
     card.className = "card";
     card.innerHTML = `
       <div class="header">
-        <h3>⚡ AutoFillUp Assistant</h3>
+        <h3 class="header-title">⚡ AutoFillUp Page Inspector</h3>
         <button class="close-btn" title="Close status">×</button>
       </div>
       <div class="body">
@@ -338,61 +364,66 @@ export class AssistantOverlay {
           ${!options.outcomes.length ? `<span class="badge badge-skipped">No inputs found</span>` : ""}
         </div>
 
-        <div class="learn-banner">
-          <span>💡 Fill this form on the page once, then click below:</span>
-          <button id="learn-page-btn" class="learn-btn">💾 Learn & Save Page to Profile</button>
+        <div class="action-banner">
+          <button id="learn-page-btn" class="btn-quick-learn" title="Extract filled inputs from page into editor & profile">
+            📥 Learn from Form
+          </button>
+          <button id="save-all-btn" class="btn-save-all" title="Save all edited field values and fill page">
+            💾 Save All & Fill Page
+          </button>
         </div>
 
-        ${
-          remainingUnknown.length
-            ? `<div class="section-box">
-                <div class="section-header">
-                  <span style="color:#c084fc;">? Remaining to Teach (${remainingUnknown.length}):</span>
-                </div>
-                <div class="field-list">
-                  ${remainingUnknown
-                    .map(
-                      (f) => `
-                      <div class="field-row">
-                        <span class="field-label" title="${f.label}">${f.label}</span>
-                        <button class="teach-btn" data-id="${f.fieldId}">Teach</button>
-                      </div>
-                    `
-                    )
-                    .join("")}
-                </div>
-              </div>`
-            : `<div class="all-good-box">✓ All fields on this page are taught & configured!</div>`
-        }
+        <div class="fields-table-container">
+          <div class="fields-table-header">
+            <span>Detected Page Fields (${options.outcomes.length})</span>
+            <span style="font-size:10px;color:#38bdf8;">Edit & Save Values</span>
+          </div>
+          <div class="fields-list" id="fields-list">
+            ${options.outcomes
+              .map((item) => {
+                let domVal = "";
+                try {
+                  const el = document.getElementById(item.fieldId) || document.querySelector(`[name="${CSS.escape(item.fieldId)}"]`);
+                  if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) {
+                    domVal = el.value.trim();
+                  } else if (el?.textContent) {
+                    const txt = el.textContent.trim();
+                    if (!txt.startsWith("Select") && txt !== "Choose...") domVal = txt;
+                  }
+                } catch {}
 
-        ${
-          filledItems.length
-            ? `<div class="section-box">
-                <div class="section-header">
-                  <span style="color:#34d399;">✓ Configured Fields & Values (${filledItems.length}):</span>
-                  <button class="toggle-link" id="toggle-filled-btn">Toggle View</button>
-                </div>
-                <div class="field-list" id="filled-list-container">
-                  ${filledItems
-                    .map(
-                      (item) => `
-                      <div class="field-row">
-                        <span class="field-label" title="${item.label}">${item.label}</span>
-                        <span class="field-value" title="${item.valueAttempted || 'Configured'}">${item.valueAttempted || '✓ Configured'}</span>
-                      </div>
-                    `
-                    )
-                    .join("")}
-                </div>
-              </div>`
-            : ""
-        }
+                const initialVal = item.valueAttempted || domVal || "";
+                const isUnknown = item.outcome === "unknown" || item.outcome === "review" || !initialVal;
+
+                return `
+                  <div class="field-item" data-id="${item.fieldId}">
+                    <div class="field-top-row">
+                      <span class="field-label" title="${item.label}">${item.label}</span>
+                      <span class="field-kind-badge">${item.kind}</span>
+                    </div>
+                    <div class="field-input-row">
+                      <input 
+                        type="text" 
+                        class="field-input" 
+                        data-field-id="${item.fieldId}" 
+                        data-label="${item.label}" 
+                        placeholder="${isUnknown ? 'Type answer to save...' : 'Value to fill'}" 
+                        value="${initialVal.replace(/"/g, "&quot;")}"
+                      />
+                      <button class="btn-row-save" data-field-id="${item.fieldId}" data-label="${item.label}" title="Save this field value">💾</button>
+                      <button class="btn-row-teach" data-field-id="${item.fieldId}" title="Advanced teach / map options">⚙</button>
+                    </div>
+                  </div>
+                `;
+              })
+              .join("")}
+          </div>
+        </div>
       </div>
+
       <div class="footer">
         <button class="forget-btn" id="forget-btn" title="Clear form inputs and forget custom mappings for this page">🔄 Forget Page</button>
-        <div class="footer-actions">
-          <button class="refill-btn" id="refill-btn">Rescan & Fill</button>
-        </div>
+        <button class="refill-btn" id="refill-btn">Rescan & Refill</button>
       </div>
     `;
 
@@ -401,36 +432,93 @@ export class AssistantOverlay {
 
     const toast = card.querySelector<HTMLDivElement>("#toast-msg")!;
     const learnBtn = card.querySelector<HTMLButtonElement>("#learn-page-btn");
+    const saveAllBtn = card.querySelector<HTMLButtonElement>("#save-all-btn");
     const forgetBtn = card.querySelector<HTMLButtonElement>("#forget-btn");
-    const toggleFilledBtn = card.querySelector<HTMLButtonElement>("#toggle-filled-btn");
-    const filledListContainer = card.querySelector<HTMLDivElement>("#filled-list-container");
 
-    if (toggleFilledBtn && filledListContainer) {
-      toggleFilledBtn.addEventListener("click", () => {
-        filledListContainer.style.display = filledListContainer.style.display === "none" ? "flex" : "none";
+    // Handle "Save All & Fill Page"
+    if (saveAllBtn) {
+      saveAllBtn.addEventListener("click", async () => {
+        saveAllBtn.disabled = true;
+        saveAllBtn.textContent = "Saving & Filling...";
+
+        const inputs = card.querySelectorAll<HTMLInputElement>(".field-input");
+        const entries: FieldSaveEntry[] = [];
+        inputs.forEach((input) => {
+          const val = input.value.trim();
+          const label = input.getAttribute("data-label") || "";
+          const fieldId = input.getAttribute("data-field-id") || "";
+          if (val && label) {
+            entries.push({ fieldId, label, value: val });
+          }
+        });
+
+        try {
+          const count = await options.onSavePageValues(entries);
+          toast.textContent = `✓ Saved ${count} field values & updated page!`;
+          toast.style.display = "block";
+          setTimeout(() => {
+            options.onRefill();
+          }, 800);
+        } catch {
+          toast.textContent = "Error saving values.";
+          toast.style.display = "block";
+          saveAllBtn.disabled = false;
+          saveAllBtn.textContent = "💾 Save All & Fill Page";
+        }
       });
     }
 
+    // Handle individual row save button (💾)
+    card.querySelectorAll<HTMLButtonElement>(".btn-row-save").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const fieldId = btn.getAttribute("data-field-id");
+        const label = btn.getAttribute("data-label") || "";
+        const input = card.querySelector<HTMLInputElement>(`.field-input[data-field-id="${CSS.escape(fieldId || "")}"]`);
+        const val = input?.value.trim() || "";
+
+        if (!val) {
+          toast.textContent = `Please enter a value for "${label}" before saving.`;
+          toast.style.display = "block";
+          return;
+        }
+
+        btn.disabled = true;
+        try {
+          await options.onSavePageValues([{ fieldId: fieldId || "", label, value: val }]);
+          toast.textContent = `✓ Saved "${label}" = "${val}"`;
+          toast.style.display = "block";
+          setTimeout(() => {
+            options.onRefill();
+          }, 600);
+        } catch {
+          toast.textContent = `Error saving ${label}`;
+          toast.style.display = "block";
+          btn.disabled = false;
+        }
+      });
+    });
+
+    // Handle "Learn from Form"
     if (learnBtn) {
       learnBtn.addEventListener("click", async () => {
         learnBtn.disabled = true;
-        learnBtn.textContent = "Scanning & Learning...";
+        learnBtn.textContent = "Extracting...";
         try {
           const res = await options.onLearnPage();
           if (res && res.learnedCount > 0) {
             const allItems = res.profileFieldsUpdated.concat(res.mappingsCreated);
-            const breakdown = allItems.slice(0, 6).map((item) => `• ${item}`).join("<br/>");
-            const extra = allItems.length > 6 ? `<br/>...and ${allItems.length - 6} more` : "";
-            
+            const breakdown = allItems.slice(0, 5).map((item) => `• ${item}`).join("<br/>");
+            const extra = allItems.length > 5 ? `<br/>...and ${allItems.length - 5} more` : "";
+
             toast.innerHTML = `<strong>✓ Learned ${res.learnedCount} Field(s):</strong><br/>${breakdown}${extra}`;
             toast.style.display = "block";
             setTimeout(() => {
               options.onRefill();
-            }, 1200);
+            }, 1000);
           } else {
-            toast.textContent = "No filled values detected on page yet. Type in your details on the form first!";
+            toast.textContent = "No filled values detected on page yet. Type values into the form or editor first!";
             toast.style.display = "block";
-            learnBtn.textContent = "💾 Learn & Save Page to Profile";
+            learnBtn.textContent = "📥 Learn from Form";
             learnBtn.disabled = false;
           }
         } catch {
@@ -441,6 +529,7 @@ export class AssistantOverlay {
       });
     }
 
+    // Handle "Forget Page"
     if (forgetBtn) {
       forgetBtn.addEventListener("click", async () => {
         forgetBtn.disabled = true;
@@ -463,13 +552,21 @@ export class AssistantOverlay {
     card.querySelector(".close-btn")?.addEventListener("click", () => this.remove());
     card.querySelector("#refill-btn")?.addEventListener("click", () => options.onRefill());
 
-    card.querySelectorAll<HTMLButtonElement>(".teach-btn").forEach((btn) => {
+    // Handle advanced teach button (⚙)
+    card.querySelectorAll<HTMLButtonElement>(".btn-row-teach").forEach((btn) => {
       btn.addEventListener("click", () => {
-        const id = btn.getAttribute("data-id");
-        const unknownField = options.unknownFields.find((f) => f.fieldId === id);
-        if (unknownField) {
-          this.showTeachModal(unknownField, options);
-        }
+        const id = btn.getAttribute("data-field-id");
+        const unknownField = options.unknownFields.find((f) => f.fieldId === id) || {
+          fieldId: id || "",
+          label: btn.closest(".field-item")?.querySelector(".field-label")?.textContent || "Field",
+          accessibleName: "",
+          placeholder: "",
+          kind: "text" as any,
+          section: "",
+          options: [],
+          detectedAt: new Date().toISOString()
+        };
+        this.showTeachModal(unknownField, options);
       });
     });
 
@@ -512,8 +609,8 @@ export class AssistantOverlay {
     modalBackdrop.className = "modal-backdrop";
     modalBackdrop.innerHTML = `
       <div class="modal">
-        <h4>Teach Field: "${field.label}"</h4>
-        <p style="font-size:12px;color:#94a3b8;margin:0 0 12px 0;">Configure how AutoFillUp should fill this field now and in future applications.</p>
+        <h4>Advanced Mapping: "${field.label}"</h4>
+        <p style="font-size:12px;color:#94a3b8;margin:0 0 12px 0;">Configure custom profile mapping or fixed response rule.</p>
         
         <label>Mapping Target</label>
         <select id="source-type">

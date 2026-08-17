@@ -5,7 +5,7 @@ import { scanFields } from "./fields/field-detector";
 import { MappingEngine } from "./mapping/mapping-engine";
 import { executeAutofillField } from "./autofill/autofill-engine";
 import { TeachingController } from "./learning/teaching-controller";
-import { learnCurrentPageValues, forgetCurrentPage } from "./learning/page-learner";
+import { learnCurrentPageValues, savePageFieldValues, forgetCurrentPage } from "./learning/page-learner";
 import { AssistantOverlay } from "./ui/overlay";
 import { ProfileStore } from "../storage/profile-store";
 import { MappingStore } from "../storage/mapping-store";
@@ -75,6 +75,9 @@ async function runAutofill(showOverlayUI = true): Promise<{ outcomes: FieldFillR
         },
         onLearnPage: async () => {
           return await learnCurrentPageValues(document, profileStore, mappingStore);
+        },
+        onSavePageValues: async (entries) => {
+          return await savePageFieldValues(entries, document, profileStore, mappingStore);
         },
         onForgetPage: async () => {
           return await forgetCurrentPage(document, profileStore, mappingStore);
