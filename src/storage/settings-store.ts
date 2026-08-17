@@ -27,6 +27,22 @@ export class SettingsStore {
 
   async save(settings: Partial<Settings>): Promise<void> {
     const current = await this.get();
-    await this.storage.set(key, { ...current, ...settings });
+    const updated = { ...current, ...settings };
+    await this.storage.set(key, updated);
+
+    // Save safety snapshot for build updates
+    try {
+      if (typeof chrome !== "undefined" && chrome.storage?.local) {
+        const raw = await chrome.storage.local.get(["profile", "fieldMappings"]);
+        await chrome.storage.local.set({
+          autofillup_backup_snapshot: {
+            profile: raw.profile || {},
+            fieldMappings: raw.fieldMappings || [],
+            settings: updated,
+            savedAt: new Date().toISOString()
+          }
+        });
+      }
+    } catch {}
   }
 }

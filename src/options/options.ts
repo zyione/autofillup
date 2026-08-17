@@ -581,3 +581,56 @@ document.querySelector("#import-json-btn")?.addEventListener("click", async () =
 
 // Initial load
 void loadAllData();
+
+// Update snapshot UI
+async function updateSnapshotInfo(): Promise<void> {
+  const timeEl = document.querySelector<HTMLSpanElement>("#snapshot-time");
+  if (!timeEl) return;
+
+  try {
+    const raw = await chrome.storage.local.get("autofillup_backup_snapshot");
+    if (raw.autofillup_backup_snapshot?.savedAt) {
+      const date = new Date(raw.autofillup_backup_snapshot.savedAt);
+      timeEl.textContent = `Last Auto-Snapshot: ${date.toLocaleDateString()} ${date.toLocaleTimeString()}`;
+    } else {
+      timeEl.textContent = "No auto-snapshot found yet.";
+    }
+  } catch {
+    timeEl.textContent = "Auto-Snapshot active.";
+  }
+}
+
+void updateSnapshotInfo();
+
+// Restore from Auto-Snapshot button
+document.querySelector("#restore-snapshot-btn")?.addEventListener("click", async () => {
+  const statusEl = document.querySelector<HTMLDivElement>("#snapshot-status")!;
+  statusEl.textContent = "Restoring from snapshot...";
+  statusEl.style.color = "#38bdf8";
+
+  try {
+    const raw = await chrome.storage.local.get("autofillup_backup_snapshot");
+    const snap = raw.autofillup_backup_snapshot;
+    if (!snap || !snap.profile) {
+      statusEl.textContent = "No valid snapshot found to restore.";
+      statusEl.style.color = "#ef4444";
+      return;
+    }
+
+    if (snap.profile) await profileStore.save(snap.profile);
+    if (Array.isArray(snap.fieldMappings)) {
+      for (const m of snap.fieldMappings) {
+        await mappingStore.save(m);
+      }
+    }
+    if (snap.settings) await settingsStore.save(snap.settings);
+
+    statusEl.textContent = "✓ Restored profile & settings from auto-snapshot!";
+    statusEl.style.color = "#10b981";
+    void loadAllData();
+    void updateSnapshotInfo();
+  } catch (err) {
+    statusEl.textContent = `Restore failed: ${String(err)}`;
+    statusEl.style.color = "#ef4444";
+  }
+});

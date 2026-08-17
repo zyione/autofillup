@@ -25,7 +25,23 @@ export class ProfileStore {
   }
 
   async save(profile: UserProfile): Promise<void> {
-    await this.storage.set(profileKey, { ...profile, updatedAt: new Date().toISOString() });
+    const updated = { ...profile, updatedAt: new Date().toISOString() };
+    await this.storage.set(profileKey, updated);
+
+    // Save safety snapshot for build updates
+    try {
+      if (typeof chrome !== "undefined" && chrome.storage?.local) {
+        const raw = await chrome.storage.local.get(["fieldMappings", "settings"]);
+        await chrome.storage.local.set({
+          autofillup_backup_snapshot: {
+            profile: updated,
+            fieldMappings: raw.fieldMappings || [],
+            settings: raw.settings || {},
+            savedAt: new Date().toISOString()
+          }
+        });
+      }
+    } catch {}
   }
 
   async addEducation(record: EducationRecord): Promise<void> {

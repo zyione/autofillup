@@ -284,6 +284,16 @@
               </div>
               <div id="import-msg" class="status-msg" style="margin-top: 10px;"></div>
             </div>
+
+            <div class="card" style="margin-top: 16px;">
+              <h3>Automatic Build & Reload Safety Snapshot</h3>
+              <p class="subtitle">AutoFillUp automatically maintains a local recovery snapshot every time you make changes so your configuration persists across builds and updates.</p>
+              <div style="display:flex;align-items:center;gap:12px;margin-top:8px;">
+                <span id="snapshot-time" style="font-size:12px;color:#38bdf8;">Checking auto-snapshot...</span>
+                <button type="button" class="btn btn-secondary btn-sm" id="restore-snapshot-btn">Restore from Auto-Snapshot</button>
+              </div>
+              <div id="snapshot-status" style="font-size:12px;margin-top:8px;"></div>
+            </div>
           </section>
         </div>
       </main>
