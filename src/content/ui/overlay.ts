@@ -247,7 +247,10 @@ export class AssistantOverlay {
       });
     });
 
-    document.documentElement.appendChild(this.host);
+    const target = document.body || document.documentElement;
+    if (target) {
+      target.appendChild(this.host);
+    }
   }
 
   private showTeachModal(field: UnknownFieldInfo, options: OverlayOptions): void {

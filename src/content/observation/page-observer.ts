@@ -19,62 +19,92 @@ export class PageObserver {
   start(): void {
     // 1. Monitor SPA History navigation
     const checkNavigation = () => {
-      const current = detectPageFingerprint(location, document);
-      if (!areFingerprintsEqual(this.lastFingerprint, current)) {
-        this.lastFingerprint = current;
-        this.callbacks.onPageChange(current);
-      }
+      try {
+        const current = detectPageFingerprint(location, document);
+        if (!areFingerprintsEqual(this.lastFingerprint, current)) {
+          this.lastFingerprint = current;
+          this.callbacks.onPageChange(current);
+        }
+      } catch {}
     };
 
     window.addEventListener("popstate", checkNavigation);
 
-    // Patch pushState and replaceState to catch SPA page switches
-    const originalPushState = history.pushState;
-    history.pushState = function (...args) {
-      const result = originalPushState.apply(this, args);
-      window.dispatchEvent(new Event("locationchange"));
-      return result;
-    };
+    // Patch pushState and replaceState safely to catch SPA page switches
+    try {
+      const originalPushState = history.pushState;
+      if (typeof originalPushState === "function") {
+        history.pushState = function (...args) {
+          try {
+            const result = originalPushState.apply(window.history, args);
+            window.dispatchEvent(new Event("locationchange"));
+            return result;
+          } catch {
+            return originalPushState.apply(this, args);
+          }
+        };
+      }
+    } catch {}
 
-    const originalReplaceState = history.replaceState;
-    history.replaceState = function (...args) {
-      const result = originalReplaceState.apply(this, args);
-      window.dispatchEvent(new Event("locationchange"));
-      return result;
-    };
+    try {
+      const originalReplaceState = history.replaceState;
+      if (typeof originalReplaceState === "function") {
+        history.replaceState = function (...args) {
+          try {
+            const result = originalReplaceState.apply(window.history, args);
+            window.dispatchEvent(new Event("locationchange"));
+            return result;
+          } catch {
+            return originalReplaceState.apply(this, args);
+          }
+        };
+      }
+    } catch {}
 
     window.addEventListener("locationchange", checkNavigation);
 
     // 2. MutationObserver with debouncing and loop-filtering
-    this.mutationObserver = new MutationObserver((mutations) => {
-      if (this.isProcessing) return;
+    try {
+      this.mutationObserver = new MutationObserver((mutations) => {
+        if (this.isProcessing) return;
 
-      // Filter mutations: ignore our own overlay or irrelevant attribute changes
-      const hasRelevantMutation = mutations.some((m) => {
-        if (m.target instanceof HTMLElement && m.target.closest("#autofillup-host, #autofillup-status")) {
-          return false;
+        // Filter mutations: ignore our own overlay or irrelevant attribute changes
+        const hasRelevantMutation = mutations.some((m) => {
+          try {
+            if (m.target && m.target instanceof HTMLElement) {
+              if (m.target.closest("#autofillup-host, #autofillup-status")) {
+                return false;
+              }
+            }
+            return m.type === "childList" || (m.type === "attributes" && m.attributeName === "aria-hidden");
+          } catch {
+            return false;
+          }
+        });
+
+        if (!hasRelevantMutation) return;
+
+        if (this.debounceTimer !== null) {
+          clearTimeout(this.debounceTimer);
         }
-        return m.type === "childList" || (m.type === "attributes" && m.attributeName === "aria-hidden");
+
+        this.debounceTimer = window.setTimeout(() => {
+          try {
+            checkNavigation();
+            this.callbacks.onDynamicFields();
+          } catch {}
+        }, 600);
       });
 
-      if (!hasRelevantMutation) return;
-
-      if (this.debounceTimer !== null) {
-        clearTimeout(this.debounceTimer);
+      if (document.documentElement) {
+        this.mutationObserver.observe(document.documentElement, {
+          childList: true,
+          subtree: true,
+          attributes: true,
+          attributeFilter: ["aria-hidden", "class", "style"]
+        });
       }
-
-      this.debounceTimer = window.setTimeout(() => {
-        checkNavigation();
-        this.callbacks.onDynamicFields();
-      }, 600);
-    });
-
-    this.mutationObserver.observe(document.documentElement, {
-      childList: true,
-      subtree: true,
-      attributes: true,
-      attributeFilter: ["aria-hidden", "class", "style"]
-    });
+    } catch {}
   }
 
   setProcessing(processing: boolean): void {
@@ -85,6 +115,10 @@ export class PageObserver {
     if (this.mutationObserver) {
       this.mutationObserver.disconnect();
       this.mutationObserver = null;
+    }
+    if (this.debounceTimer !== null) {
+      clearTimeout(this.debounceTimer);
+      this.debounceTimer = null;
     }
   }
 }
