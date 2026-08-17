@@ -181,6 +181,10 @@ export class AssistantOverlay {
         flex-direction: column;
         gap: 4px;
       }
+      .field-item.is-ignored {
+        opacity: 0.6;
+        background: rgba(0, 0, 0, 0.15);
+      }
       .field-item:last-child {
         border-bottom: none;
       }
@@ -201,11 +205,25 @@ export class AssistantOverlay {
         text-overflow: ellipsis;
         white-space: nowrap;
       }
+      .field-badges {
+        display: flex;
+        gap: 4px;
+        align-items: center;
+      }
       .field-kind-badge {
         font-size: 9px;
         text-transform: uppercase;
         color: #64748b;
         background: #0f172a;
+        padding: 1px 5px;
+        border-radius: 4px;
+      }
+      .field-ignored-badge {
+        font-size: 9px;
+        font-weight: 700;
+        color: #f87171;
+        background: #450a0a;
+        border: 1px solid #991b1b;
         padding: 1px 5px;
         border-radius: 4px;
       }
@@ -229,6 +247,11 @@ export class AssistantOverlay {
         border-color: #0284c7;
         background: #172554;
       }
+      .field-input:disabled {
+        color: #64748b;
+        background: #090e1a;
+        cursor: not-allowed;
+      }
       .field-input::placeholder {
         color: #64748b;
         font-style: italic;
@@ -243,7 +266,7 @@ export class AssistantOverlay {
         cursor: pointer;
         font-weight: 600;
       }
-      .btn-row-save:hover {
+      .btn-row-save:hover:not(:disabled) {
         background: #0284c7;
       }
       .btn-row-teach {
@@ -434,14 +457,18 @@ export class AssistantOverlay {
                     }
                   } catch {}
 
-                  const initialVal = item.valueAttempted || domVal || "";
-                  const isUnknown = item.outcome === "unknown" || item.outcome === "review" || !initialVal;
+                  const isIgnored = item.mappingSource === "ignore" || item.outcome === "skipped";
+                  const initialVal = isIgnored ? "" : item.valueAttempted || domVal || "";
+                  const isUnknown = !isIgnored && (item.outcome === "unknown" || item.outcome === "review" || !initialVal);
 
                   return `
-                    <div class="field-item" data-id="${item.fieldId}">
+                    <div class="field-item ${isIgnored ? 'is-ignored' : ''}" data-id="${item.fieldId}">
                       <div class="field-top-row">
                         <span class="field-label" title="${item.label}">${item.label}</span>
-                        <span class="field-kind-badge">${item.kind}</span>
+                        <div class="field-badges">
+                          ${isIgnored ? `<span class="field-ignored-badge">IGNORED</span>` : ""}
+                          <span class="field-kind-badge">${item.kind}</span>
+                        </div>
                       </div>
                       <div class="field-input-row">
                         <input 
@@ -449,11 +476,12 @@ export class AssistantOverlay {
                           class="field-input" 
                           data-field-id="${item.fieldId}" 
                           data-label="${item.label}" 
-                          placeholder="${isUnknown ? 'Type answer to save...' : 'Value to fill'}" 
+                          placeholder="${isIgnored ? 'Permanently ignored (skipped)' : (isUnknown ? 'Type answer to save...' : 'Value to fill')}" 
                           value="${initialVal.replace(/"/g, "&quot;")}"
+                          ${isIgnored ? 'disabled' : ''}
                         />
-                        <button class="btn-row-save" data-field-id="${item.fieldId}" data-label="${item.label}" title="Save this value to Profile">💾</button>
-                        <button class="btn-row-teach" data-field-id="${item.fieldId}" title="Advanced teach / map options">⚙</button>
+                        <button class="btn-row-save" data-field-id="${item.fieldId}" data-label="${item.label}" title="Save this value to Profile" ${isIgnored ? 'disabled' : ''}>💾</button>
+                        <button class="btn-row-teach" data-field-id="${item.fieldId}" title="Advanced teach / map / ignore options">⚙</button>
                       </div>
                     </div>
                   `;
@@ -515,7 +543,7 @@ export class AssistantOverlay {
         saveProfileBtn.disabled = true;
         saveProfileBtn.textContent = "Saving to Profile...";
 
-        const inputs = card.querySelectorAll<HTMLInputElement>(".field-input");
+        const inputs = card.querySelectorAll<HTMLInputElement>(".field-input:not([disabled])");
         const entries: FieldSaveEntry[] = [];
         inputs.forEach((input) => {
           const val = input.value.trim();
@@ -632,12 +660,13 @@ export class AssistantOverlay {
     card.querySelectorAll<HTMLButtonElement>(".btn-row-teach").forEach((btn) => {
       btn.addEventListener("click", () => {
         const id = btn.getAttribute("data-field-id");
+        const found = options.outcomes.find((o) => o.fieldId === id);
         const unknownField = options.unknownFields.find((f) => f.fieldId === id) || {
           fieldId: id || "",
-          label: btn.closest(".field-item")?.querySelector(".field-label")?.textContent || "Field",
+          label: found?.label || btn.closest(".field-item")?.querySelector(".field-label")?.textContent || "Field",
           accessibleName: "",
           placeholder: "",
-          kind: "text" as any,
+          kind: (found?.kind || "text") as any,
           section: "",
           options: [],
           detectedAt: new Date().toISOString()
@@ -668,12 +697,12 @@ export class AssistantOverlay {
     if (labelLower.includes("last")) defaultProfilePath = "personal.lastName";
     else if (labelLower.includes("middle")) defaultProfilePath = "personal.middleName";
     else if (labelLower.includes("email") || labelLower.includes("e-mail")) defaultProfilePath = "contact.email";
-    else if (labelLower.includes("phone") || labelLower.includes("mobile") || labelLower.includes("cell")) defaultProfilePath = "contact.phone";
+    else if (labelLower.includes("phone") && !labelLower.includes("code")) defaultProfilePath = "contact.phone";
     else if (labelLower.includes("address") || labelLower.includes("street")) defaultProfilePath = "contact.address";
     else if (labelLower.includes("city")) defaultProfilePath = "contact.city";
     else if (labelLower.includes("state") || labelLower.includes("province")) defaultProfilePath = "contact.state";
     else if (labelLower.includes("zip") || labelLower.includes("postal")) defaultProfilePath = "contact.postalCode";
-    else if (labelLower.includes("country")) defaultProfilePath = "contact.country";
+    else if (labelLower.includes("country") && !labelLower.includes("code") && !labelLower.includes("phone")) defaultProfilePath = "contact.country";
     else if (labelLower.includes("linkedin")) defaultProfilePath = "professional.linkedin";
     else if (labelLower.includes("github")) defaultProfilePath = "professional.github";
     else if (labelLower.includes("portfolio")) defaultProfilePath = "professional.portfolio";
@@ -794,8 +823,13 @@ export class AssistantOverlay {
           <label>Fixed Value / Answer:</label>
           <input type="text" id="fixed-val-input" placeholder="e.g. Yes, No, or standard answer" value="${pageCurrentValue}"/>
         `;
-      } else {
-        dynamicInputs.innerHTML = `<p style="font-size:12px;color:#94a3b8;margin-top:10px;">This field will be skipped automatically on future scans.</p>`;
+      } else if (type === "ignore") {
+        dynamicInputs.innerHTML = `
+          <div style="background:#450a0a;border:1px solid #991b1b;border-radius:6px;padding:8px 10px;margin-top:10px;">
+            <strong style="color:#f87171;font-size:12px;">🚫 Ignore Permanently</strong>
+            <p style="font-size:11px;color:#fca5a5;margin:4px 0 0 0;">AutoFillUp will never autofill this field and will skip it across all job applications.</p>
+          </div>
+        `;
       }
     };
 
@@ -825,12 +859,12 @@ export class AssistantOverlay {
         fixedVal = modalBackdrop.querySelector<HTMLInputElement>("#fixed-val-input")?.value || "";
         pathOrValue = fixedVal;
         enteredVal = fixedVal;
+      } else if (type === "ignore") {
+        pathOrValue = "";
       }
 
-      void options.onTeach(field.fieldId, type, pathOrValue, fixedVal, enteredVal).then(() => {
-        modalBackdrop.remove();
-        options.onRefill();
-      });
+      modalBackdrop.remove();
+      void options.onTeach(field.fieldId, type, pathOrValue, fixedVal, enteredVal);
     });
 
     this.shadow.appendChild(modalBackdrop);

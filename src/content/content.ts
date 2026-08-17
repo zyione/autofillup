@@ -51,7 +51,17 @@ async function runAutofill(showOverlayUI = true, isManual = false): Promise<{ ou
       const candidate = mappingEngine.resolve(field);
       let result: FieldFillResult;
 
-      if (shouldWriteToDOM) {
+      if (candidate.source === "ignore") {
+        result = {
+          fieldId: field.id,
+          label: field.fingerprint.label || field.rawLabel || "Unnamed field",
+          kind: field.fingerprint.kind,
+          outcome: "skipped",
+          detail: "Permanently ignored by user rule.",
+          confidence: 100,
+          mappingSource: "ignore"
+        };
+      } else if (shouldWriteToDOM) {
         result = await executeAutofillField(field, candidate, settings.overwriteExisting);
       } else {
         // Inspection mode: do not write to DOM automatically without user consent
@@ -71,12 +81,14 @@ async function runAutofill(showOverlayUI = true, isManual = false): Promise<{ ou
 
       outcomes.push(result);
 
-      // Register for teaching if unknown, review, confidence 0, or missing value
+      // Register for teaching ONLY if not ignored, not skipped, and missing/low-confidence value
       if (
-        result.outcome === "unknown" ||
-        result.outcome === "review" ||
-        candidate.confidence === 0 ||
-        !candidate.value
+        candidate.source !== "ignore" &&
+        result.outcome !== "skipped" &&
+        (result.outcome === "unknown" ||
+         result.outcome === "review" ||
+         candidate.confidence === 0 ||
+         !candidate.value)
       ) {
         teachingController.registerUnknown(field);
       }
@@ -92,6 +104,7 @@ async function runAutofill(showOverlayUI = true, isManual = false): Promise<{ ou
         profile,
         onTeach: async (fieldId, source, pathOrVal, fixedVal, enteredVal) => {
           await teachingController.teachField(fieldId, source, pathOrVal, fixedVal, enteredVal);
+          void runAutofill(true, false);
         },
         onLearnPage: async () => {
           return await learnCurrentPageValues(document, profileStore, mappingStore);

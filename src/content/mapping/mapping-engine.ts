@@ -38,7 +38,7 @@ const builtinRules: BuiltinRule[] = [
   // Contact
   { pattern: /\b(e[- ]?mail|email address)\b/, path: "contact.email" },
   { pattern: /\b(phone|mobile|cell|telephone)( number)?\b/, path: "contact.phone" },
-  { pattern: /\bcountry\b/, path: "contact.country" },
+  { pattern: /\bcountry\b(?!\s*phone|\s*dial|\s*code)/i, path: "contact.country" },
   { pattern: /\b(address|street address|address line 1)\b/, path: "contact.address" },
   { pattern: /\bcity\b/, path: "contact.city" },
   { pattern: /\b(state|province|region)\b/, path: "contact.state" },
@@ -70,15 +70,20 @@ export class MappingEngine {
   resolve(field: FieldDescriptor): MatchCandidate {
     const label = normalizeLabel(field.fingerprint.label);
     const accessibleName = normalizeLabel(field.fingerprint.accessibleName);
+    const rawLabelLower = field.rawLabel ? normalizeLabel(field.rawLabel) : "";
     const combinedLabel = `${label} ${accessibleName}`.trim();
     const tenant = field.fingerprint.tenant;
 
-    // 1. Check exact user saved mapping
+    // 1. Check exact user saved mapping (highest priority)
     const userMapping = this.savedMappings.find((m) => {
       if (!m.enabled) return false;
       if (m.tenantScope !== "*" && m.tenantScope !== tenant) return false;
       const mappingLabel = normalizeLabel(m.fingerprint.label);
-      return mappingLabel === label || mappingLabel === accessibleName;
+      return (
+        mappingLabel === label ||
+        mappingLabel === accessibleName ||
+        (rawLabelLower && mappingLabel === rawLabelLower)
+      );
     });
 
     if (userMapping) {
@@ -87,7 +92,7 @@ export class MappingEngine {
           mapping: userMapping,
           source: "ignore",
           confidence: 100,
-          reason: "Ignored by user rule"
+          reason: "Ignored permanently by user rule"
         };
       }
 
