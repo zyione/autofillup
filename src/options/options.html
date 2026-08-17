@@ -1,1 +1,294 @@
-<!doctype html><html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/><title>AutoFillUp settings</title><link rel="stylesheet" href="./options.css"/></head><body><main><h1>AutoFillUp – MyWorkday</h1><p class="intro">Your details stay in this browser. Review every application before submitting.</p><form id="profile-form"><section><h2>Personal</h2><div class="grid"><label>First name<input name="personal.firstName" required/></label><label>Middle name<input name="personal.middleName"/></label><label>Last name<input name="personal.lastName" required/></label><label>Preferred name<input name="personal.preferredName"/></label></div></section><section><h2>Contact</h2><div class="grid"><label>Email<input name="contact.email" type="email"/></label><label>Phone<input name="contact.phone" type="tel"/></label><label>Country<input name="contact.country"/></label><label>Address<input name="contact.address"/></label><label>City<input name="contact.city"/></label><label>State / province<input name="contact.state"/></label><label>Postal code<input name="contact.postalCode"/></label></div></section><section><h2>Professional links</h2><div class="grid"><label>LinkedIn<input name="professional.linkedin" type="url"/></label><label>GitHub<input name="professional.github" type="url"/></label><label>Portfolio<input name="professional.portfolio" type="url"/></label><label>Website<input name="professional.website" type="url"/></label></div></section><section><h2>Reusable application answers</h2><p>Add answers for questions such as sponsorship or willingness to relocate. They will only be used after you teach a matching field.</p><div id="answers"></div><button id="add-answer" type="button">Add answer</button></section><section><h2>Safety</h2><label class="check"><input id="overwrite" type="checkbox"/> Allow replacing a value already entered in a form</label></section><div class="actions"><button type="submit">Save profile</button><span id="status" role="status"></span></div></form></main><script type="module" src="./options.ts"></script></body></html>
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AutoFillUp – MyWorkday Settings</title>
+    <link rel="stylesheet" href="./options.css" />
+  </head>
+  <body>
+    <div class="app-layout">
+      <!-- Sidebar Navigation -->
+      <aside class="sidebar">
+        <div class="brand">
+          <div class="logo-icon">⚡</div>
+          <div class="brand-text">
+            <h2>AutoFillUp</h2>
+            <span>Workday Assistant</span>
+          </div>
+        </div>
+
+        <nav class="nav-menu">
+          <button class="nav-item active" data-tab="personal">Personal & Contact</button>
+          <button class="nav-item" data-tab="education">Education</button>
+          <button class="nav-item" data-tab="employment">Employment</button>
+          <button class="nav-item" data-tab="skills">Skills</button>
+          <button class="nav-item" data-tab="custom-fields">Custom Fields</button>
+          <button class="nav-item" data-tab="answers">Application Answers</button>
+          <button class="nav-item" data-tab="mappings">Mapping Library</button>
+          <button class="nav-item" data-tab="settings">Safety & Settings</button>
+          <button class="nav-item" data-tab="backup">Backup & Restore</button>
+        </nav>
+
+        <div class="privacy-notice">
+          🔒 <strong>100% Local</strong>
+          <p>Your profile data never leaves your device.</p>
+        </div>
+      </aside>
+
+      <!-- Main Content Area -->
+      <main class="content-area">
+        <header class="topbar">
+          <h1 id="page-title">Personal & Contact</h1>
+          <div class="topbar-actions">
+            <button id="save-all-btn" class="btn btn-primary">Save All Changes</button>
+            <span id="save-status" class="status-msg" role="status"></span>
+          </div>
+        </header>
+
+        <div class="tab-content">
+          <!-- 1. Personal & Contact Tab -->
+          <section id="tab-personal" class="tab-pane active">
+            <div class="card">
+              <h3>Personal Details</h3>
+              <div class="form-grid">
+                <div class="form-group">
+                  <label for="p-firstName">First / Given Name <span class="required">*</span></label>
+                  <input id="p-firstName" type="text" placeholder="Jane" />
+                </div>
+                <div class="form-group">
+                  <label for="p-middleName">Middle Name</label>
+                  <input id="p-middleName" type="text" placeholder="Marie" />
+                </div>
+                <div class="form-group">
+                  <label for="p-lastName">Last / Family Name <span class="required">*</span></label>
+                  <input id="p-lastName" type="text" placeholder="Doe" />
+                </div>
+                <div class="form-group">
+                  <label for="p-preferredName">Preferred Name</label>
+                  <input id="p-preferredName" type="text" placeholder="Jane" />
+                </div>
+              </div>
+            </div>
+
+            <div class="card">
+              <h3>Contact Details</h3>
+              <div class="form-grid">
+                <div class="form-group">
+                  <label for="c-email">Email Address <span class="required">*</span></label>
+                  <input id="c-email" type="email" placeholder="jane.doe@example.com" />
+                </div>
+                <div class="form-group">
+                  <label for="c-phone">Phone Number <span class="required">*</span></label>
+                  <input id="c-phone" type="tel" placeholder="+1 (555) 123-4567" />
+                </div>
+                <div class="form-group">
+                  <label for="c-country">Country / Territory</label>
+                  <input id="c-country" type="text" placeholder="United States" />
+                </div>
+                <div class="form-group full-width">
+                  <label for="c-address">Street Address</label>
+                  <input id="c-address" type="text" placeholder="123 Main St, Apt 4B" />
+                </div>
+                <div class="form-group">
+                  <label for="c-city">City</label>
+                  <input id="c-city" type="text" placeholder="San Francisco" />
+                </div>
+                <div class="form-group">
+                  <label for="c-state">State / Province</label>
+                  <input id="c-state" type="text" placeholder="California" />
+                </div>
+                <div class="form-group">
+                  <label for="c-postalCode">Postal / Zip Code</label>
+                  <input id="c-postalCode" type="text" placeholder="94105" />
+                </div>
+              </div>
+            </div>
+
+            <div class="card">
+              <h3>Professional Links</h3>
+              <div class="form-grid">
+                <div class="form-group">
+                  <label for="l-linkedin">LinkedIn URL</label>
+                  <input id="l-linkedin" type="url" placeholder="https://linkedin.com/in/janedoe" />
+                </div>
+                <div class="form-group">
+                  <label for="l-github">GitHub URL</label>
+                  <input id="l-github" type="url" placeholder="https://github.com/janedoe" />
+                </div>
+                <div class="form-group">
+                  <label for="l-portfolio">Portfolio URL</label>
+                  <input id="l-portfolio" type="url" placeholder="https://janedoe.dev" />
+                </div>
+                <div class="form-group">
+                  <label for="l-website">Personal Website</label>
+                  <input id="l-website" type="url" placeholder="https://janedoe.me" />
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- 2. Education Tab -->
+          <section id="tab-education" class="tab-pane">
+            <div class="card-header-bar">
+              <div>
+                <h3>Education Records</h3>
+                <p class="subtitle">Add your academic history in chronological order.</p>
+              </div>
+              <button id="add-edu-btn" class="btn btn-secondary">+ Add Education</button>
+            </div>
+            <div id="education-list" class="records-list"></div>
+          </section>
+
+          <!-- 3. Employment Tab -->
+          <section id="tab-employment" class="tab-pane">
+            <div class="card-header-bar">
+              <div>
+                <h3>Employment Records</h3>
+                <p class="subtitle">Add your work experience records.</p>
+              </div>
+              <button id="add-emp-btn" class="btn btn-secondary">+ Add Employment</button>
+            </div>
+            <div id="employment-list" class="records-list"></div>
+          </section>
+
+          <!-- 4. Skills Tab -->
+          <section id="tab-skills" class="tab-pane">
+            <div class="card">
+              <h3>Categorized Skills</h3>
+              <p class="subtitle">Enter comma-separated items for each skill category.</p>
+
+              <div class="form-group">
+                <label for="sk-languages">Programming Languages</label>
+                <input id="sk-languages" type="text" placeholder="TypeScript, JavaScript, Python, Go, Rust" />
+              </div>
+              <div class="form-group">
+                <label for="sk-frameworks">Frameworks & Libraries</label>
+                <input id="sk-frameworks" type="text" placeholder="React, Node.js, Next.js, Express, Tailwind" />
+              </div>
+              <div class="form-group">
+                <label for="sk-databases">Databases</label>
+                <input id="sk-databases" type="text" placeholder="PostgreSQL, MySQL, Redis, MongoDB" />
+              </div>
+              <div class="form-group">
+                <label for="sk-cloud">Cloud & DevOps</label>
+                <input id="sk-cloud" type="text" placeholder="AWS, GCP, Docker, Kubernetes, CI/CD" />
+              </div>
+              <div class="form-group">
+                <label for="sk-tools">Tools & Platforms</label>
+                <input id="sk-tools" type="text" placeholder="Git, Vite, Webpack, Figma, Jira" />
+              </div>
+              <div class="form-group">
+                <label for="sk-certifications">Certifications</label>
+                <input id="sk-certifications" type="text" placeholder="AWS Solutions Architect, CKA" />
+              </div>
+              <div class="form-group">
+                <label for="sk-other">Other Skills</label>
+                <input id="sk-other" type="text" placeholder="Agile, System Design, Team Leadership" />
+              </div>
+            </div>
+          </section>
+
+          <!-- 5. Custom Fields Tab -->
+          <section id="tab-custom-fields" class="tab-pane">
+            <div class="card-header-bar">
+              <div>
+                <h3>Custom Profile Fields</h3>
+                <p class="subtitle">Create reusable custom attributes (e.g. Expected Salary, Clearance Level).</p>
+              </div>
+              <button id="add-custom-btn" class="btn btn-secondary">+ Add Custom Field</button>
+            </div>
+            <div id="custom-fields-list" class="records-list"></div>
+          </section>
+
+          <!-- 6. Application Answers Tab -->
+          <section id="tab-answers" class="tab-pane">
+            <div class="card-header-bar">
+              <div>
+                <h3>Application Answers</h3>
+                <p class="subtitle">Predefined answers for common employer screening questions.</p>
+              </div>
+              <button id="add-answer-btn" class="btn btn-secondary">+ Add Answer</button>
+            </div>
+            <div id="answers-list" class="records-list"></div>
+          </section>
+
+          <!-- 7. Mapping Library Tab -->
+          <section id="tab-mappings" class="tab-pane">
+            <div class="card-header-bar">
+              <div>
+                <h3>Learned Field Mappings</h3>
+                <p class="subtitle">Mappings taught across previous applications.</p>
+              </div>
+              <div class="search-box">
+                <input id="mapping-search" type="text" placeholder="Search mappings..." />
+              </div>
+            </div>
+            <div id="mappings-list" class="records-list"></div>
+          </section>
+
+          <!-- 8. Safety & Settings Tab -->
+          <section id="tab-settings" class="tab-pane">
+            <div class="card">
+              <h3>Autofill Safety Preferences</h3>
+              <div class="settings-list">
+                <label class="setting-item">
+                  <div class="setting-text">
+                    <strong>Auto-fill High Confidence Fields</strong>
+                    <span>Automatically populate fields when semantic matching confidence is >= 80%.</span>
+                  </div>
+                  <input id="set-autoFillHigh" type="checkbox" checked />
+                </label>
+
+                <label class="setting-item">
+                  <div class="setting-text">
+                    <strong>Protect Existing Values</strong>
+                    <span>Never overwrite non-empty fields already filled in by the user.</span>
+                  </div>
+                  <input id="set-protectExisting" type="checkbox" checked />
+                </label>
+
+                <label class="setting-item">
+                  <div class="setting-text">
+                    <strong>Show Floating Assistant Status</strong>
+                    <span>Display status badge with "Teach Field" review helper on Workday pages.</span>
+                  </div>
+                  <input id="set-floatingStatus" type="checkbox" checked />
+                </label>
+
+                <div class="setting-item">
+                  <div class="setting-text">
+                    <strong>Minimum Confidence Threshold</strong>
+                    <span>Fields with score below this will be flagged for review.</span>
+                  </div>
+                  <input id="set-threshold" type="number" min="50" max="100" value="80" style="width: 80px;" />
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- 9. Backup & Restore Tab -->
+          <section id="tab-backup" class="tab-pane">
+            <div class="card">
+              <h3>Export Profile & Mappings</h3>
+              <p class="subtitle">Download a secure JSON backup of your local profile, answers, and learned mappings.</p>
+              <button id="export-json-btn" class="btn btn-secondary">Download Backup (.JSON)</button>
+            </div>
+
+            <div class="card">
+              <h3>Restore from Backup</h3>
+              <p class="subtitle">Import a previously exported JSON backup file.</p>
+              <div class="import-area">
+                <input id="import-file" type="file" accept=".json" />
+                <button id="import-json-btn" class="btn btn-primary">Import & Apply</button>
+              </div>
+              <div id="import-msg" class="status-msg" style="margin-top: 10px;"></div>
+            </div>
+          </section>
+        </div>
+      </main>
+    </div>
+
+    <script type="module" src="./options.ts"></script>
+  </body>
+</html>

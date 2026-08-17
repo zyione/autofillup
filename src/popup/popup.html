@@ -1,14 +1,52 @@
 <!doctype html>
 <html lang="en">
-  <head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /><title>AutoFillUp</title><link rel="stylesheet" href="./popup.css" /></head>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AutoFillUp – MyWorkday</title>
+    <link rel="stylesheet" href="./popup.css" />
+  </head>
   <body>
-    <main>
-      <h1>AutoFillUp</h1>
-      <p id="status" role="status">Open a Workday application to begin.</p>
-      <button id="fill" type="button">Fill this page</button>
-      <p id="summary"></p>
-      <a href="../options/options.html" target="_blank">Open settings</a>
-    </main>
+    <div class="popup-container">
+      <header class="popup-header">
+        <div class="brand">
+          <span class="logo">⚡</span>
+          <div>
+            <h2>AutoFillUp</h2>
+            <span class="tagline">Workday Assistant</span>
+          </div>
+        </div>
+        <div id="site-badge" class="site-badge inactive">Checking...</div>
+      </header>
+
+      <main class="popup-body">
+        <div id="page-info" class="page-info" style="display: none;">
+          <span class="tenant-label" id="tenant-name">Tenant: —</span>
+          <h3 class="page-heading" id="page-name">Application Page</h3>
+        </div>
+
+        <div id="status-card" class="status-card">
+          <p id="status-msg">Open a Workday job application to begin.</p>
+          <div id="metrics-grid" class="metrics-grid" style="display: none;">
+            <div class="metric metric-filled"><strong id="cnt-filled">0</strong><span>Filled</span></div>
+            <div class="metric metric-review"><strong id="cnt-review">0</strong><span>Review</span></div>
+            <div class="metric metric-unknown"><strong id="cnt-unknown">0</strong><span>Unknown</span></div>
+            <div class="metric metric-skipped"><strong id="cnt-skipped">0</strong><span>Skipped</span></div>
+          </div>
+        </div>
+
+        <div class="actions">
+          <button id="autofill-btn" class="btn btn-primary" disabled>Autofill Page</button>
+          <button id="review-btn" class="btn btn-secondary" style="display: none;">Review & Teach Unknown</button>
+        </div>
+      </main>
+
+      <footer class="popup-footer">
+        <button id="open-options-btn" class="link-btn">⚙ Open Profile & Settings</button>
+        <span class="privacy-tag">🔒 Local-Only</span>
+      </footer>
+    </div>
+
     <script type="module" src="./popup.ts"></script>
   </body>
 </html>
